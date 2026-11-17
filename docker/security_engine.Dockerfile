@@ -8,7 +8,12 @@ WORKDIR /app
 
 COPY requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --retries 10 --timeout 120 --no-cache-dir -r requirements.txt
+    apt-get update \
+    && apt-get upgrade -y \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir --upgrade "pip==26.3" \
+    && rm -f /usr/local/lib/python3.12/ensurepip/_bundled/pip-*.whl \
+    && pip install --retries 10 --timeout 120 --no-cache-dir -r requirements.txt
 
 COPY src ./src
 
