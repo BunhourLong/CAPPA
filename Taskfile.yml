@@ -29,11 +29,6 @@ tasks:
       - task: check
       - git push -u origin HEAD
 
-  ai:
-    desc: 'Run a job on an OpenCode Go model: task ai -- <explore|write|tests|review|attack> <prompt-file>. AI_MODEL overrides the model'
-    cmds:
-      - bash scripts/ai.sh {{.CLI_ARGS}}
-
   brief:
     desc: 'Run a task and print one line on a pass or the tail on a failure: task brief -- check'
     cmds:

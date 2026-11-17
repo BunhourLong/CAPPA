@@ -76,3 +76,4 @@ tests/qa/
 # =========================
 .task/
 .scan/
+.delegate/

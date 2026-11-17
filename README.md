@@ -1,30 +1,27 @@
-# Cappa — Layer 7 Web Threat Monitoring & Response Platform
+# Cappa — Layer 7 Web Threat Monitoring & Response
 
 ![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688?logo=fastapi&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
 ![NGINX](https://img.shields.io/badge/NGINX-1.27-009639?logo=nginx&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-yellow)
 
-Cappa is a self-hosted web security monitoring and automated response platform. It tails NGINX access logs in real time, classifies HTTP traffic through eight specialized threat detectors, scores IP reputation using a multi-state machine, and automatically enforces blocks by rewriting the NGINX blocklist — all without restarting the server.
-
-An analyst dashboard provides live visibility into alerts, geographic threat maps, blocked IPs, and per-alert investigation controls.
+Cappa is a self-hosted security layer in front of a website or API. NGINX writes `access.log`; the security engine tails it, runs eight detectors, scores IP reputation and writes an NGINX blocklist. A FastAPI app serves an Angular dashboard to analysts, with events, alerts, reputation history and audit records stored in PostgreSQL 16.
 
 ---
 
 ## Key Features
 
-- **Real-time log monitoring** — tails NGINX `access.log` with zero polling delay
-- **8 Layer 7 threat detectors** — brute force, SQL injection, XSS, credential stuffing, rate abuse, path probing, API scraping, user-agent rotation
-- **IP reputation state machine** — five states (trusted → unknown → suspicious → throttled → blocked) with automatic score decay
-- **Live NGINX blocklist enforcement** — writes `deny` rules to a dynamically included conf file; NGINX hot-reloads it without downtime
-- **Analyst dashboard** — alert queue, alert status workflow (unresolved / safe / malicious), live stats, and geographic map view
-- **GeoIP & ASN enrichment** — MaxMind GeoLite2 databases for country, city, and network-owner attribution
-- **Manual IP controls** — analysts can manually block, trust, whitelist, or suppress auto-blocking for any IP
-- **Full audit trail** — every reputation state transition is persisted to PostgreSQL
-- **Role-based access** — readonly / analyst / admin tiers enforced per route
-- **Dockerized multi-service deployment** — single `docker compose up --build -d` brings the entire stack online
+- **Log monitoring** — tails NGINX `access.log` and parses each new line into an event.
+- **8 detectors** — rate abuse, brute force, SQL injection, XSS, path probing, scraping, credential stuffing and user-agent rotation.
+- **IP reputation** — five states (trusted, unknown, suspicious, throttled, blocked), score decay and an alert hold for non-safe alerts.
+- **NGINX enforcement** — writes `deny` rules to an included blocklist; NGINX checks it every 2 seconds and reloads when it changes.
+- **Analyst dashboard** — alert queue, status workflow, statistics and a geographic map.
+- **GeoIP and ASN context** — MaxMind GeoLite2 City and ASN data for country, city, organisation and hosting-provider flags on map points.
+- **IP controls** — block, unblock, trust, whitelist, suppress auto-blocking or force an unblock.
+- **Audit records** — reputation transitions and analyst actions are stored in PostgreSQL.
+- **Role-based access** — readonly, analyst and admin.
+- **Compose stack** — one `docker compose up --build -d` starts NGINX, FastAPI, the engine and PostgreSQL, plus the companion site.
 
 ---
 
@@ -36,78 +33,79 @@ An analyst dashboard provides live visibility into alerts, geographic threat map
                                ▼
                     ┌─────────────────────┐
                     │     NGINX (port 80) │
-                    │  path routing:      │
-                    │    /       → app    │
-                    │    /siem/  → Cappa  │
-                    │  blocklist enforce  │
+                    │  /       → site     │
+                    │  /admin/ → admin    │
+                    │  /siem/  → Cappa    │
+                    │  blocklist include  │
                     │  access.log write   │
-                    └──────────┬──────────┘
-                               │ log file (shared volume)
-              ┌────────────────┴───────────────┐
-              ▼                                ▼
- ┌────────────────────────┐     ┌──────────────────────────┐
- │  Security Engine       │     │  Cappa API (FastAPI)     │
- │  LogMonitorService     │     │  port 8000               │
- │  ─ tail access.log     │     │  ─ dashboard UI          │
- │  ─ parse log lines     │     │  ─ alerts REST API       │
- │  ─ run 8 detectors     │     │  ─ IP control endpoints  │
- │  ─ score reputation    │     │  ─ session auth (HMAC)   │
- │  ─ write blocklist     │     │  ─ map data endpoint     │
- └──────────┬─────────────┘     └────────────┬─────────────┘
-            │                                │
-            └──────────────┬─────────────────┘
-                           ▼
-              ┌────────────────────────┐
-              │  PostgreSQL 16         │
-              │  ─ events              │
-              │  ─ alerts              │
-              │  ─ ip_reputations      │
-              │  ─ ip_reputation_      │
-              │    transitions (audit) │
-              └────────────────────────┘
+                    └──┬───────────────┬──┘
+       /siem/ proxy    │               │ access.log (volume)
+                       ▼               ▼
+        ┌──────────────────────┐   ┌────────────────────────┐
+        │ Cappa API (FastAPI)  │   │ Security Engine        │
+        │ port 8000            │   │ LogMonitorService      │
+        │ ─ dashboard UI       │   │ ─ tail access.log      │
+        │ ─ alerts REST API    │   │ ─ parse log lines      │
+        │ ─ IP control routes  │   │ ─ run 8 detectors      │
+        │ ─ session auth       │   │ ─ score reputation     │
+        │ ─ map data           │   │ ─ write blocklist ─────┼──► NGINX reload
+        └──────────┬───────────┘   └───────────┬────────────┘
+                   │                           │
+                   └─────────────┬─────────────┘
+                                 ▼
+                    ┌────────────────────────┐
+                    │  PostgreSQL 16         │
+                    │  ─ events              │
+                    │  ─ alerts              │
+                    │  ─ ip_reputations      │
+                    │  ─ ip_reputation_      │
+                    │    transitions (audit) │
+                    │  ─ users, audit_logs   │
+                    └────────────────────────┘
 ```
 
 **Data flow:**
-1. A request hits NGINX → NGINX logs it to `access.log` → NGINX enforces any existing IP blocks
-2. `LogMonitorService` reads the new log line → parses it into an `HTTPLogEvent`
-3. `SecurityEngine` runs all 8 detectors against the event
-4. Alerts are persisted; `EnforcementService` re-scores the IP reputation and rewrites `blocklist.conf` if the score crosses the block threshold
-5. The Cappa dashboard (Angular) reflects all changes in near real time by polling the JSON API
 
----
-
-## Screenshots
-
-> _Add screenshots or GIFs here._
-
-| Dashboard | Alerts | Geographic Map |
-|---|---|---|
-| ![Dashboard](docs/screenshots/dashboard.png) | ![Alerts](docs/screenshots/alerts.png) | ![Map](docs/screenshots/map.png) |
+1. A request hits NGINX. NGINX logs it to `access.log` and applies the current blocklist.
+2. `LogMonitorService` reads new log lines from the file (starting at the end) and parses each one into an `HTTPLogEvent`.
+3. `SecurityEngine` runs all eight detectors against the event and persists the event and any alerts.
+4. `EnforcementService` recalculates the IP's reputation and rewrites the blocklist when its state changes.
+5. NGINX checks the blocklist every 2 seconds and runs `nginx -s reload` when it changes.
+6. The UI polls the JSON API: the alerts page every 5 seconds, the dashboard and map every 15 seconds.
 
 ---
 
 ## Domain & Routing
 
-All path routing is handled by NGINX. The domain nginx listens on is set via a single environment variable — no nginx config edits required when switching environments.
+NGINX handles all path routing. The host it answers on comes from a single environment variable, so switching environments does not require editing the NGINX config.
 
-| Path | Destination | Notes |
+| Path | Destination | Access |
 |---|---|---|
-| `http://<host>/` | BookMark-Publisher (Express) | Public site |
-| `http://<host>/admin` | BookMark-Publisher admin panel | Requires admin login |
-| `http://<host>/siem` | Cappa dashboard (FastAPI) | Requires analyst/admin login |
-| `http://<host>/health` | nginx | Returns `ok` — used for health checks |
+| `/` | BookMark-Publisher (Express) | Public site |
+| `/admin/` | BookMark-Publisher admin panel | Proxied to the companion app |
+| `/siem` | Redirects to `/siem/login` | Public |
+| `/siem/` | Cappa dashboard and API | Public shell; data needs a session |
+| `/health` | NGINX | Public, returns `ok` |
+
+Public routes are the SPA shell (`/siem/`, `/siem/login`, `/siem/dashboard`, `/siem/denied`, and `/siem/alerts` when the request accepts HTML), the login/logout endpoints and `/siem/health`. Data endpoints under `/siem/api/` require a session, apart from login and logout:
+
+- **readonly** — dashboard, statistics and map.
+- **analyst** (and admin) — alert list, alert detail, alert status changes, IP block/unblock.
+- **admin** — IP trust/whitelist/suppression/force-unblock controls and deleting all alerts.
+
+`POST /siem/ingest-event` returns 404 at the edge. The API's `/ingest-event` route is for internal senders and requires the token set in `SIEM_INGEST_TOKEN`.
 
 To change the domain, edit one line in `stack/.env`:
 
 ```bash
-# Local development (default)
+# Local development
 NGINX_HOST=localhost
 
 # EC2 / production
 NGINX_HOST=capnova.duckdns.org
 ```
 
-Then restart the stack: `docker compose up -d --force-recreate nginx`
+Then recreate NGINX: `docker compose up -d --force-recreate nginx`.
 
 ---
 
@@ -115,148 +113,158 @@ Then restart the stack: `docker compose up -d --force-recreate nginx`
 
 ### Prerequisites
 
-- Docker + Docker Compose (v2)
-- GeoLite2 databases — download free from [MaxMind](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data) and place in `cybersiem/data/`:
-  - `GeoLite2-City.mmdb`
-  - `GeoLite2-ASN.mmdb`
+- Docker and Docker Compose v2
+- The BookMark-Publisher repository checked out as a sibling directory (the stack builds it)
+- GeoLite2 City and ASN databases (`GeoLite2-City.mmdb`, `GeoLite2-ASN.mmdb`), downloaded free from [MaxMind](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data) into `data/`
 
 ### Steps
 
 ```bash
-# 1. Clone both repos side by side
-git clone https://github.com/YOUR_USERNAME/cappa.git          cybersiem
-git clone https://github.com/YOUR_USERNAME/bookmark-publisher.git
+# 1. Clone this repository and its companion site side by side
+git clone https://github.com/BunhourLong/CYBERSIEM.git cybersiem
+git clone <bookmark-publisher-repository> bookmark-publisher
 
 # Required layout:
 # FYP/
-#   cybersiem/          ← this repo (stack/ lives inside)
+#   cybersiem/          ← this repository (stack/ lives inside)
 #   bookmark-publisher/
 
 # 2. Create the environment file
 cd cybersiem/stack
-cp .env.example .env    # NGINX_HOST=localhost is the default — no edits needed for local
+cp .env.example .env
 
-# 3. Build and start
+# 3. Edit .env before starting:
+#    SIEM_SESSION_SECRET   a random value of at least 32 bytes
+#    SIEM_ADMIN_PASSWORD   at least 12 characters
+#    POSTGRES_PASSWORD     a real password, also used in DATABASE_URL
+#    Generate secrets with: openssl rand -base64 32
+
+# 4. Build and start
 docker compose up --build -d
 
-# 4. Verify
+# 5. Verify
 curl http://localhost/health        # → ok
-curl http://localhost/siem          # → redirects to /siem/login
+curl http://localhost/siem          # → 301 to /siem/login
 ```
 
-Open `http://localhost/siem/login` and sign in with the credentials from `.env`.
+Open `http://localhost/siem/login` and sign in with `SIEM_ADMIN_USERNAME` and `SIEM_ADMIN_PASSWORD`. The admin account is seeded at API startup only when the password is at least 12 characters; the API refuses to start while `SIEM_SESSION_SECRET` is a placeholder or shorter than 32 bytes.
 
 ### Key Environment Variables
 
 | Variable | Default | Description |
 |---|---|---|
-| `NGINX_HOST` | `localhost` | Domain nginx binds to — change to your DuckDNS/domain for EC2 |
-| `SIEM_ADMIN_USERNAME` | `admin` | Dashboard login username |
-| `SIEM_ADMIN_PASSWORD` | `Admin123456!!` | Dashboard login password (min 12 chars) |
-| `SIEM_SESSION_SECRET` | _(placeholder)_ | HMAC secret for cookies — run `openssl rand -base64 32` |
-| `TRUSTED_PROXY_CIDRS` | _(empty)_ | Comma-separated CIDRs of load balancers in front of NGINX; empty when NGINX is the edge, no wider than /8 (IPv4) or /32 (IPv6) |
-| `DATABASE_URL` | _(local postgres)_ | PostgreSQL connection string |
-| `GEOIP_DB_PATH` | `/data/GeoLite2-City.mmdb` | Container path to GeoIP database |
-| `SESSION_SECURE` | `false` | Set `true` only after HTTPS is configured |
+| `NGINX_HOST` | `localhost` | Host NGINX answers on; change it for EC2 or a custom domain |
+| `SIEM_SESSION_SECRET` | `change_me` | HMAC secret for session cookies. Must be 32+ bytes and not a placeholder; the API refuses to start otherwise |
+| `SIEM_ADMIN_USERNAME` | `admin` | Admin account created at first startup |
+| `SIEM_ADMIN_PASSWORD` | `change_me_min_12_chars` | Must be 12+ characters, or the admin seed is skipped |
+| `SIEM_INGEST_TOKEN` | empty | Bearer token for `/ingest-event`; empty disables the route |
+| `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | `cybersiem`, `cybersiem`, `change_me` | PostgreSQL credentials; change the password |
+| `DATABASE_URL` | `postgresql://cybersiem:change_me@postgres:5432/cybersiem` | Must match the `POSTGRES_*` settings |
+| `TRUSTED_PROXY_CIDRS` | empty | Comma-separated CIDRs of load balancers in front of NGINX; no wider than /8 (IPv4) or /32 (IPv6) |
+| `GEOIP_DB_PATH`, `GEOIP_ASN_DB_PATH` | `/data/GeoLite2-City.mmdb`, `/data/GeoLite2-ASN.mmdb` | Container paths to the MaxMind databases |
+| `SESSION_SECURE` | `false` | Set to `true` only after HTTPS is configured |
 
-Docker Desktop's published ports can make every client appear as the gateway. Send a request from another machine and confirm its IP is `$remote_addr`, the first field of NGINX's access.log.
-
-See [`stack/.env.example`](stack/.env.example) for the full documented list.
+`stack/.env.example` documents the remaining options, including the reputation tuning variables. On Docker Desktop, published ports can make every client appear as the gateway; send a request from another machine and confirm its IP is the first field of NGINX's `access.log`.
 
 ---
 
 ## EC2 Deployment
 
 ```bash
-# 1. Provision: Ubuntu 24.04, t3.small+, ports 22 + 80 open
+# 1. Provision: Ubuntu 24.04, t3.small+, ports 22 and 80 open
 
 # 2. Install Docker
 curl -fsSL https://get.docker.com | sh
 sudo usermod -aG docker ubuntu && newgrp docker
 
-# 3. Clone repos
+# 3. Clone both repositories
 mkdir ~/apps && cd ~/apps
-git clone https://github.com/YOUR_USERNAME/cappa.git cybersiem
-git clone https://github.com/YOUR_USERNAME/bookmark-publisher.git
+git clone https://github.com/BunhourLong/CYBERSIEM.git cybersiem
+git clone <bookmark-publisher-repository> bookmark-publisher
 
-# 4. Copy GeoIP databases
+# 4. Refresh the GeoIP databases if needed
 scp GeoLite2-*.mmdb ubuntu@<EC2_IP>:~/apps/cybersiem/data/
 
-# 5. Create .env — set NGINX_HOST to your domain
+# 5. Create .env
 cd ~/apps/cybersiem/stack
 cp .env.example .env
 nano .env
-# Key lines to update:
-#   NGINX_HOST=capnova.duckdns.org
+# Set:
+#   NGINX_HOST=<your domain>
 #   SIEM_SESSION_SECRET=<openssl rand -base64 32>
-#   SIEM_ADMIN_PASSWORD=<strong password>
+#   SIEM_ADMIN_PASSWORD=<12+ character password>
+#   POSTGRES_PASSWORD=<strong password> and the matching DATABASE_URL
 #   EXPRESS_ADMIN_PASSWORD=<strong password>
 #   SECURITY_ADMIN_TOKEN=<openssl rand -hex 32>
+#   SECURITY_LAB_MODE=false
 
-# 6. Point capnova.duckdns.org to EC2 IP at duckdns.org
+# 6. Point the domain at the EC2 IP
 
-# 7. Launch
+# 7. Launch and follow the logs
 docker compose up --build -d
-
-# 8. Tail logs
 docker compose logs -f
-```
-
-**Keep DuckDNS updated** (if EC2 IP changes on reboot):
-```bash
-echo "*/5 * * * * curl -s 'https://www.duckdns.org/update?domains=capnova&token=YOUR_TOKEN&ip=' > /dev/null" | crontab -
-```
-
-**Switch domain later** — only one line to change:
-```bash
-# In stack/.env on EC2:
-NGINX_HOST=capnova.duckdns.org
-
-# Apply without full rebuild:
-docker compose up -d --force-recreate nginx
 ```
 
 ---
 
 ## Detection Capabilities
 
-All detectors implement the `Detector` abstract base class (`evaluate(HTTPLogEvent) → list[DetectionAlert]`) and run in sequence per log line.
+`build_detectors()` returns the eight detectors below. They implement `Detector.evaluate(HTTPLogEvent)` and run in sequence for each parsed line. The behavioural detectors keep per-IP sliding windows.
 
-| Detector | What it catches | Default thresholds | Severity |
-|---|---|---|---|
-| **BruteForceDetector** | Repeated login failures on `/login` (401/403) | 5 attempts / 300s | High / Medium |
-| **RateAbuseDetector** | Abnormally high request volume from one IP | 30 req / 60s | Medium |
-| **PayloadDetector** | SQL injection patterns in request targets (UNION SELECT, OR 1=1, DROP TABLE, comment sequences) | Pattern match | High |
-| **XSSPayloadDetector** | XSS injection patterns (`<script>`, `onerror`, `javascript:`, `iframe`, `eval`, etc.) — 11 signatures | Pattern match | High |
-| **CredentialStuffingDetector** | Auth failures spread across multiple endpoints or paired with user-agent rotation | 10 failures / 300s across 2+ endpoints, or 3+ user agents | High / Medium |
-| **PathProbeDetector** | 404 spray (directory guessing) and broad endpoint enumeration | 15 × 404 / 120s; or 20 req to 10+ unique endpoints | Medium |
-| **ScrapingDetector** | Systematic API or content enumeration — many successful GETs to distinct endpoints | 50 req to 30+ endpoints / 60s | Medium |
-| **UserAgentRotationDetector** | Evasion via user-agent cycling; flags generic bot frameworks (curl, python-requests, wget, go-http-client, okhttp) | 5 distinct UAs / 300s | High / Medium |
+| Detector | Alert type | What it catches | Thresholds | Severity |
+|---|---|---|---|---|
+| **BruteForceDetector** | `brute_force` | Failed logins on `/login` | 5 failures (401/403) in 300 s | Medium |
+| **RateAbuseDetector** | `rate_abuse` | High request volume from one IP | 30 requests in 60 s | Medium |
+| **PayloadDetector** | `payload_sqli` | SQL injection in the decoded request target or user agent: `UNION SELECT`, `OR 1=1`, `DROP TABLE`, `information_schema`, SQL comment terminators | Pattern match | High |
+| **XSSPayloadDetector** | `xss_payload` | XSS signatures such as `<script>`, event handlers, `javascript:`, `<iframe>`, `eval(`, `document.cookie` | 13 patterns | High |
+| **CredentialStuffingDetector** | `credential_stuffing` | Auth failures spread across endpoints or user agents | 10 failures in 300 s, with 2+ endpoints or 3+ user agents | High if 3+ user agents, otherwise Medium |
+| **PathProbeDetector** | `404_spray` / `path_probe` | 404 spray and broad endpoint enumeration | 15 404s in 120 s, or 20 requests across 10+ unique paths in 120 s | Medium |
+| **ScrapingDetector** | `scraping` | Successful GET requests to many distinct endpoints | 50 GETs across 30+ unique endpoints in 60 s | Medium |
+| **UserAgentRotationDetector** | `user_agent_rotation` | User-agent cycling and generic bot clients | 5 distinct user agents in 300 s | High if a generic bot user agent is present, otherwise Medium |
 
 ### Reputation Scoring
 
-Each alert type carries a score weight. A running score per IP determines the current state:
+Each active alert contributes its base weight to the IP's score. Alerts marked safe stop contributing; `lifetime_score` keeps the historical total. A repeat active alert within 15 minutes of the previous active alert counts 1.35× its base weight. Scores decay at **8 points per hour** after a 15-minute grace period.
 
-```
-Score     State
-──────────────────────────
-  < 10    Unknown
-  10–24   Suspicious
-  25–44   Throttled
-  ≥ 70    Blocked → deny rule injected into NGINX
-```
+| Score | State |
+|---|---|
+| < 10 | trusted |
+| 10–24 | unknown |
+| 25–44 | suspicious |
+| 45–69 | throttled |
+| ≥ 70 | blocked |
 
-Score decays at **8 points per hour**. After a block expires (30 min default), the IP enters a 30-min cooldown before returning to `Unknown`. Every state transition is written to `ip_reputation_transitions` for full audit history.
+| Alert type | Weight |
+|---|---|
+| `payload_sqli` | 35 |
+| `credential_stuffing` | 25 |
+| `xss_payload` | 18 |
+| `path_probe` | 12 |
+| `scraping` | 12 |
+| `rate_abuse` | 10 |
+| `brute_force` | 10 |
+| `404_spray` | 10 |
+| `user_agent_rotation` | 8 |
 
-Alert weights: `payload_sqli=35` · `credential_stuffing=25` · `brute_force=20` · `xss_payload=18` · `path_probe=12` · `scraping=12` · `rate_abuse=10`
+**Blocking rules:**
+
+- **Alert hold.** An unresolved or malicious alert with weight ≥ 20, or any high-severity alert, holds the IP in `blocked` with no timer until every such alert is marked safe. A single XSS or SQL injection alert therefore blocks until it is marked safe.
+- **Timed block.** Three active alerts with weight ≥ 10 within 15 minutes, or a score of 70 or more, blocks the IP for **30 minutes**. One brute-force alert (five failures) does not block; three within 15 minutes do.
+- **Cooldown.** After a timed block expires, the IP enters a **30-minute cooldown**. Alerts from before the release do not re-block it, but fresh repeat offences can.
+- **Overrides.** A manual block has no timer. Trust or whitelist sets the state to `trusted`. Admin force-unblock overrides an alert hold for a suppression window.
+
+The default thresholds, weights and durations can be overridden with `REPUTATION_*` variables. State changes and overrides are recorded in `ip_reputation_transitions`; analyst actions are recorded in `audit_logs`.
 
 ### Analyst Actions
 
-From the dashboard, analysts can:
-- Mark alerts as **safe**, **malicious**, or leave **unresolved**
-- **Manually block** an IP with a custom reason
-- **Trust** or **whitelist** known-good IPs to suppress future alerts
-- **Unblock** an IP early
+From the dashboard:
+
+- Mark alerts as **unresolved**, **safe** or **malicious**.
+- **Block** an IP manually with a reason, or **unblock** it. Unblocking is refused while an alert hold is active; admins can force an unblock instead.
+- **Trust** or **whitelist** known-good IPs.
+- **Suppress auto-blocking** temporarily, or **clear** an override.
+
+Analysts can view alerts and block/unblock IPs. Trust, whitelist, suppression and force-unblock controls are admin-only, as is deleting all alerts.
 
 ---
 
@@ -270,15 +278,31 @@ From the dashboard, analysts can:
 | GeoIP | MaxMind GeoLite2 (City + ASN) |
 | Data validation | Pydantic v2 |
 | Containerisation | Docker, Docker Compose v2 |
-| Frontend | Angular 22 (standalone components, signals), Leaflet — built into the `api` image |
+| Frontend | Angular 22 (standalone components, signals), Leaflet, Vitest |
+
+---
+
+## Development
+
+Prerequisites: **Task 3**, **uv**, **Node 24** and **Docker**. The scanners are pinned in `Taskfile.yml`, so nothing else needs installing.
+
+```bash
+task check      # lint, Python tests, detection corpus, frontend tests and build
+task test       # Python tests (pytest)
+task eval       # replay the labelled detection corpus
+task security   # run every security scanner
+task fmt        # format Python and frontend code
+```
+
+`task test` accepts pytest arguments, for example `task test -- tests/unit/test_detectors.py`. `task eval` replays `tests/corpus` through the detectors and fails if a benign line would be blocked; it must stay green. Commits follow Conventional Commits.
 
 ---
 
 ## Frontend Development
 
-The UI lives in `frontend/` (Angular 22). Every screen is a standalone component with its own `.html` template, `.ts` logic and `.css` styles; shared colours and primitives are in `frontend/src/styles.css`. The Docker build compiles it automatically, so nothing extra is needed for `docker compose up`.
+The UI lives in `frontend/` (Angular 22). Each screen is a standalone component with its own `.html`, `.ts` and `.css` files; shared styles are in `frontend/src/styles.css`. The Docker build compiles the UI into the API image, so `docker compose up` needs nothing extra.
 
-For live-reload work, run the API on port 8000 (for example with the compose stack) and start the dev server, which proxies `/api` to it:
+For live reload, start the API on `http://localhost:8000` (the proxy target in `frontend/proxy.conf.json`) and start the dev server:
 
 ```bash
 cd frontend
@@ -288,7 +312,7 @@ npm test           # unit tests (Vitest)
 npm run build      # production bundle → frontend/dist/cappa/browser
 ```
 
-The UI talks to FastAPI only through JSON endpoints under `/api/`: `/api/auth/*` (login, logout, current user), `/api/ui/dashboard`, `/api/ui/map-points`, `/api/ui/alerts`, and the enforcement actions (`/api/alerts/{id}/status`, `/api/blocked-ips`, `/api/ip-controls`).
+The UI talks to FastAPI through relative JSON endpoints under `/api/`: `/api/auth/*`, `/api/ui/dashboard`, `/api/ui/map-points`, `/api/ui/alerts`, `/api/alerts/{id}/status`, `/api/blocked-ips` and `/api/ip-controls`.
 
 ---
 
@@ -296,64 +320,39 @@ The UI talks to FastAPI only through JSON endpoints under `/api/`: `/api/auth/*`
 
 ```
 cybersiem/
-├── data/                        # GeoLite2 .mmdb files (not in git)
-├── docker/                      # Dockerfiles and Postgres init SQL
+├── data/                        # GeoLite2 City and ASN databases
+├── docker/                      # Dockerfiles and PostgreSQL init SQL
 │   ├── api.Dockerfile
 │   ├── security_engine.Dockerfile
-│   └── postgres/init.sql        # Schema: events, alerts, ip_reputations, transitions
-├── src/
-│   ├── api/                     # FastAPI app (routes, auth, session management)
-│   │   ├── main.py              # 18 route handlers, security headers, RBAC
-│   │   ├── auth.py              # PBKDF2 password hashing, HMAC session cookies
-│   │   └── schemas.py           # Request / response Pydantic models
-│   ├── core/
-│   │   ├── http_models.py       # HTTPLogEvent, DetectionAlert dataclasses
-│   │   └── geo.py               # GeoIP lookup, IP scope classification
-│   └── security_engine/
-│       ├── engine.py            # SecurityEngine orchestrator
-│       ├── service.py           # LogMonitorService — real-time log tail + dispatch
-│       ├── parser.py            # NGINX combined log format parser
-│       ├── enforcement.py       # Reputation state machine + NginxBlocklistManager
-│       ├── enforcement_service.py # EnforcementService — manual analyst controls
-│       ├── repository.py        # PostgreSQL data access layer
-│       └── detectors/           # 8 threat detector classes
+│   └── postgres/init.sql        # Schema: events, alerts, reputations, transitions, users, audit
 ├── frontend/                    # Angular UI (served by the FastAPI container)
 │   └── src/app/
 │       ├── core/                # API client, session, guards, shared helpers
-│       ├── shared/app-header/   # Top bar (html / ts / css)
-│       └── pages/               # One folder per screen, each with .html / .ts / .css
-│           ├── login/
-│           ├── dashboard/       # + attack-map/ (Leaflet)
-│           ├── alerts/
-│           └── denied/
+│       ├── shared/app-header/   # Top bar
+│       └── pages/               # login, dashboard (+ attack-map), alerts, denied
+├── scripts/                     # Admin bootstrap and helper scripts
+├── src/
+│   ├── api/                     # FastAPI app (main.py, auth.py, schemas.py)
+│   ├── core/                    # HTTPLogEvent models, GeoIP helpers
+│   └── security_engine/         # Engine, log tail, parser, detectors, reputation, repository
 ├── stack/                       # Docker Compose deployment config
 │   ├── docker-compose.yml
-│   ├── nginx/nginx.conf.template  # NGINX config — NGINX_HOST substituted at startup
-│   ├── .env.example             # Documented template — copy to .env and fill in
-│   └── .env                     # Not in git — actual secrets and runtime config
-└── tests/                       # Test suite
+│   ├── nginx/nginx.conf.template  # NGINX config; NGINX_HOST substituted at startup
+│   └── .env.example             # Documented template — copy to .env and fill in
+└── tests/                       # Unit tests and the detection corpus
 ```
 
 ---
 
 ## Security Notes
 
-**This repository ships with demo credentials and permissive defaults.** Before any public-facing deployment:
-
-| Setting | Demo value | Production recommendation |
-|---|---|---|
-| `SIEM_SESSION_SECRET` | short placeholder | `openssl rand -base64 32` |
-| `SIEM_ADMIN_PASSWORD` | `Admin123456!!` | 16+ char random password |
-| `EXPRESS_ADMIN_PASSWORD` | `password123` | Strong unique password |
-| `SECURITY_ADMIN_TOKEN` | `lab-security-token` | `openssl rand -hex 32` |
-| `SESSION_SECURE` | `false` | `true` (requires HTTPS first) |
-| `SECURITY_LAB_MODE` | `true` | `false` |
-
-Additional recommendations:
-- Configure HTTPS (Certbot + Let's Encrypt / DuckDNS) and set `SESSION_SECURE=true`
-- Restrict port 22 to your own IP in the EC2 security group
-- Rotate all secrets before sharing access with anyone
-- The `NGINX_BLOCKLIST_PATH` volume is shared between containers — do not expose it externally
+- `SIEM_SESSION_SECRET` must be at least 32 bytes and must not contain a placeholder such as `change_me`; the API refuses to start otherwise. Generate it with `openssl rand -base64 32`.
+- `SIEM_ADMIN_PASSWORD` must be at least 12 characters, or no admin account is seeded. Change every `change_me` value before exposing the stack.
+- Set `SESSION_SECURE=true` after HTTPS is configured.
+- Leave `API_DOCS_ENABLED` unset or `false` in production; interactive docs are off by default.
+- If you run the companion BookMark-Publisher app, set `EXPRESS_ADMIN_PASSWORD` and `SECURITY_ADMIN_TOKEN`, and set `SECURITY_LAB_MODE=false` for a hardened deployment.
+- Restrict port 22 to your own IP in the EC2 security group.
+- The blocklist volume is shared between NGINX and the security engine; do not expose it outside the stack.
 
 ---
 
@@ -371,20 +370,8 @@ Additional recommendations:
 
 ---
 
-## Portfolio & Resume Value
-
-Cappa demonstrates end-to-end security engineering across several domains:
-
-- **Threat detection design** — 8 independent, composable detectors covering the OWASP Top 10 most common attack patterns, each with tunable thresholds and per-alert confidence scoring
-- **Systems programming** — real-time log processing pipeline with zero-copy parsing, sliding-window state across millions of events, and a score-decay model that prevents unbounded memory growth
-- **Distributed enforcement** — reputation decisions made in one process propagate to an NGINX gateway in under 2 seconds without a server restart, using a shared volume and a SHA-256 checksum hot-reload loop
-- **Secure web application** — HMAC-signed session cookies, PBKDF2 password hashing (260,000 iterations), role-based access control, and security headers (X-Frame-Options, X-Content-Type-Options, Referrer-Policy)
-- **Full-stack delivery** — FastAPI backend, Angular frontend, PostgreSQL schema design with JSONB metadata, and complete Docker Compose orchestration deployable to EC2 in a single command
-
----
-
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+No license has been chosen yet; all rights reserved.
 
 > Built as a Final Year Project (2025–2026). Bunhour Long · Student ID: 2023145 · Supervisor: Chandan Mukherjee
