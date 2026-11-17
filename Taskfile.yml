@@ -129,5 +129,5 @@ tasks:
       - docker build -q -f docker/security_engine.Dockerfile -t cybersiem-engine:scan .
       - docker save cybersiem-api:scan -o .scan/api.tar
       - docker save cybersiem-engine:scan -o .scan/engine.tar
-      - docker run --rm -v "$PWD/.scan:/scan:ro" {{.OSV}} scan image --archive /scan/api.tar
-      - docker run --rm -v "$PWD/.scan:/scan:ro" {{.OSV}} scan image --archive /scan/engine.tar
+      - docker run --rm -v "$PWD/.scan:/scan:ro" -v "$PWD/osv-scanner.toml:/osv-scanner.toml:ro" {{.OSV}} scan image --archive /scan/api.tar --config /osv-scanner.toml
+      - docker run --rm -v "$PWD/.scan:/scan:ro" -v "$PWD/osv-scanner.toml:/osv-scanner.toml:ro" {{.OSV}} scan image --archive /scan/engine.tar --config /osv-scanner.toml

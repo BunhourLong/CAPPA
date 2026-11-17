@@ -1,0 +1,462 @@
+# shortcut: ignores base-image vulnerabilities that Debian has not fixed yet, until 2026-12-17.
+# Then rescan: drop entries that now have a fix, or move to a smaller base image.
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2005-2541"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2007-5686"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2010-4756"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2011-3374"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2011-4116"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2013-4392"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2017-18018"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2018-20796"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2019-1010022"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2019-1010023"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2019-1010024"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2019-1010025"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2019-9192"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2021-45346"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2022-0563"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2023-31437"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2023-31438"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2023-31439"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2024-56433"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2025-5278"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2025-6141"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2025-69720"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2025-70873"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2025-8941"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-100290"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-102010"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-102473"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-102474"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-107496"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-114690"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-114691"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-115455"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-115456"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-115819"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-119371"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-119372"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-119373"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-119374"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-119375"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-119376"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-119377"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-119378"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-119379"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-119586"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-119591"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-125709"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-15059"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-15534"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-16742"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-18374"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-18477"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-18508"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-19499"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-19542"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-3184"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-39113"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-40228"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-42250"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-50812"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-50813"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-53910"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-5435"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-54369"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-54370"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-54371"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-54411"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-56391"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-56392"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-5704"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-6238"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-6368"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-6791"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-76642"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-77117"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-78408"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-78409"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-78410"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-80489"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-82560"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-84243"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-8674"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-86805"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-88822"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-88823"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-89092"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-91094"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-9538"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-95619"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-95691"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-95692"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-95818"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-97399"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
