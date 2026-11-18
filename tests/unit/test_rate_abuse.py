@@ -249,3 +249,12 @@ def test_rate_limits_are_configurable_through_the_environment(monkeypatch):
     alerts = _replay(_burst("/api/v1/catalog", 5, seconds=10))
 
     assert [alert.alert_type for alert in alerts] == ["rate_abuse"]
+
+
+@pytest.mark.parametrize("name", ["RATE_ABUSE_THRESHOLD", "RATE_ABUSE_WINDOW_SECONDS"])
+@pytest.mark.parametrize("value", ["typo", "0", "-1", ""])
+def test_invalid_rate_limits_fail_detector_startup(monkeypatch, name, value):
+    monkeypatch.setenv(name, value)
+
+    with pytest.raises(ValueError, match=name):
+        build_detectors()

@@ -8,21 +8,21 @@ from src.core.http_models import DetectionAlert, HTTPLogEvent
 from src.security_engine.detectors.base import Detector, is_static_asset
 
 
-def _positive_int_env(name: str, default: int) -> int:
-    raw_value = os.getenv(name)
-    if raw_value is None:
-        return default
+def _positive_limit(name: str, override: int | None, default: int) -> int:
+    raw_value = os.getenv(name, str(default)) if override is None else override
     try:
         value = int(raw_value)
-    except ValueError:
-        return default
-    return value if value > 0 else default
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a positive integer") from exc
+    if value < 1:
+        raise ValueError(f"{name} must be a positive integer")
+    return value
 
 
 class RateAbuseDetector(Detector):
     def __init__(self, threshold: int | None = None, window_seconds: int | None = None) -> None:
-        self.threshold = threshold or _positive_int_env("RATE_ABUSE_THRESHOLD", 30)
-        self.window = timedelta(seconds=window_seconds or _positive_int_env("RATE_ABUSE_WINDOW_SECONDS", 60))
+        self.threshold = _positive_limit("RATE_ABUSE_THRESHOLD", threshold, 30)
+        self.window = timedelta(seconds=_positive_limit("RATE_ABUSE_WINDOW_SECONDS", window_seconds, 60))
         self._events_by_ip: dict[str, deque] = defaultdict(deque)
         self._last_alert_at: dict[str, object] = {}
 
