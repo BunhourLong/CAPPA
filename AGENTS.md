@@ -35,8 +35,8 @@ Long-form plan: `plan.md`. Do NOT read it whole; read only the section a task ci
 
 ## Workflow
 - Session start: read `docs/STATE.md` (now, next task and why, pending decisions, risks). No other memory system: state lives there, decisions in `docs/adr/`, lessons in each task's "Learned".
-- Work comes from `docs/tasks/T-NNN.md`. `/task` runs the next task, `/task T-NNN` a named one, `/task P1` plans a phase. Stay in scope; list follow-ups instead of doing them.
-- Pipeline, for every code change (`/task` has the details): write code → review → write tests → test → pentest → fix from feedback → push. Review is never skipped.
+- Work comes from `docs/tasks/T-NNN.md`. `/delikit run-task` runs the next task and `/delikit run-task T-NNN` a named one, from Codex or Claude; `/task P1` plans a phase. Stay in scope; list follow-ups instead of doing them.
+- Pipeline, for every code change (`.claude/run-task.md` has the details): write code → review → write tests → test → pentest → fix from feedback → push. Review is never skipped.
 - The main session orchestrates and decides; it doesn't read or write what an agent can. Pass paths, not contents, except the brief itself.
 - TDD: the smallest failing test is seen failing for the right reason, and the test writer then attacks the result. One worker writes the test and the code together, and the main session confirms the test fails without the code before trusting it. A bug fix starts with a test that reproduces it. A guard test that passes first time proves nothing until removing the guard makes it fail.
 - Every agent that writes or reviews code runs ponytail ultra: `.claude/settings.json` sets the level, the plugin's hooks carry it to Claude sessions, a Codex orchestrator loads the `ponytail` skill at ultra, and every delegate brief restates it for Codex and OpenCode workers, which run without the plugin. It never overrides tests, validation, security or the invariants above.
