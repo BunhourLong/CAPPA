@@ -162,6 +162,7 @@ Open `http://localhost/siem/login` and sign in with `SIEM_ADMIN_USERNAME` and `S
 | `DATABASE_URL` | `postgresql://cybersiem:change_me@postgres:5432/cybersiem` | Must match the `POSTGRES_*` settings |
 | `TRUSTED_PROXY_CIDRS` | empty | Comma-separated CIDRs of load balancers in front of NGINX; no wider than /8 (IPv4) or /32 (IPv6) |
 | `GEOIP_DB_PATH`, `GEOIP_ASN_DB_PATH` | `/data/GeoLite2-City.mmdb`, `/data/GeoLite2-ASN.mmdb` | Container paths to the MaxMind databases |
+| `RATE_ABUSE_THRESHOLD`, `RATE_ABUSE_WINDOW_SECONDS` | `30`, `60` | Dynamic requests per IP per window before a `rate_abuse` alert. Successful static assets do not count |
 | `SESSION_SECURE` | `false` | Set to `true` only after HTTPS is configured |
 
 `stack/.env.example` documents the remaining options, including the reputation tuning variables. On Docker Desktop, published ports can make every client appear as the gateway; send a request from another machine and confirm its IP is the first field of NGINX's `access.log`.
@@ -222,7 +223,7 @@ docker compose logs -f
 | **ScrapingDetector** | `scraping` | Successful GET requests to many distinct endpoints | 50 GETs across 30+ unique endpoints in 60 s | Medium |
 | **UserAgentRotationDetector** | `user_agent_rotation` | User-agent cycling and generic bot clients | 5 distinct user agents in 300 s | High if a generic bot user agent is present, otherwise Medium |
 
-Rate-abuse limits are configurable with `RATE_ABUSE_THRESHOLD` and `RATE_ABUSE_WINDOW_SECONDS` (defaults: 30 dynamic requests in 60 s). Static assets, including dashboard bundles and their `/siem/assets/` form, do not count.
+Rate-abuse limits are configurable with `RATE_ABUSE_THRESHOLD` and `RATE_ABUSE_WINDOW_SECONDS` (defaults: 30 dynamic requests in 60 s) in both the API and the security engine. Successful static asset requests do not count: Angular's hashed bundles at the app root (`main-*.js`, `styles-*.css`, `polyfills-*.js` and lazy `chunk-*.js`) with or without the `/siem/` mount, and files under asset directories. Missing or error responses, and ambiguous server-side names such as `x.php.js`, still count.
 
 ### Reputation Scoring
 
