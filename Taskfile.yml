@@ -110,7 +110,7 @@ tasks:
   security:deps:
     desc: Fail on a known vulnerability in any Python or npm dependency
     cmds:
-      - docker run --rm -v "$PWD:/repo:ro" {{.OSV}} scan source -L /repo/uv.lock -L /repo/frontend/package-lock.json
+      - docker run --rm -v "$PWD:/repo:ro" {{.OSV}} scan source --config /repo/osv-scanner.toml -L /repo/uv.lock -L /repo/frontend/package-lock.json
 
   security:infra:
     desc: Lint the Dockerfiles and the rendered NGINX config

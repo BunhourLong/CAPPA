@@ -1,4 +1,4 @@
-# shortcut: ignores base-image vulnerabilities that Debian has not fixed yet, until 2026-12-17.
+# shortcut: ignores vulnerabilities that have no fixed release yet, until 2026-12-17.
 # Then rescan: drop entries that now have a fix, or move to a smaller base image.
 
 [[IgnoredVulns]]
@@ -142,6 +142,11 @@ ignoreUntil = 2026-12-17T00:00:00Z
 reason = "No fixed Debian package yet (python:3.12-slim base)"
 
 [[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-107493"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
 id = "DEBIAN-CVE-2026-107496"
 ignoreUntil = 2026-12-17T00:00:00Z
 reason = "No fixed Debian package yet (python:3.12-slim base)"
@@ -227,6 +232,26 @@ ignoreUntil = 2026-12-17T00:00:00Z
 reason = "No fixed Debian package yet (python:3.12-slim base)"
 
 [[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-121757"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-121758"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-124024"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-124709"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
 id = "DEBIAN-CVE-2026-125709"
 ignoreUntil = 2026-12-17T00:00:00Z
 reason = "No fixed Debian package yet (python:3.12-slim base)"
@@ -273,6 +298,11 @@ reason = "No fixed Debian package yet (python:3.12-slim base)"
 
 [[IgnoredVulns]]
 id = "DEBIAN-CVE-2026-3184"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "DEBIAN-CVE-2026-35190"
 ignoreUntil = 2026-12-17T00:00:00Z
 reason = "No fixed Debian package yet (python:3.12-slim base)"
 
@@ -460,3 +490,8 @@ reason = "No fixed Debian package yet (python:3.12-slim base)"
 id = "DEBIAN-CVE-2026-97399"
 ignoreUntil = 2026-12-17T00:00:00Z
 reason = "No fixed Debian package yet (python:3.12-slim base)"
+
+[[IgnoredVulns]]
+id = "GHSA-fc5q-39xc-vjpf"
+ignoreUntil = 2026-12-17T00:00:00Z
+reason = "No fixed picomatch release yet (dev dependency)"
