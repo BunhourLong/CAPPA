@@ -86,6 +86,8 @@ services:
       REPUTATION_SUPPRESS_DURATION_SECONDS: "3600"
       REPUTATION_DECAY_PER_HOUR: "8"
       REPUTATION_REPEATED_MEDIUM_ALERT_COUNT: "3"
+      RATE_ABUSE_THRESHOLD: "30"
+      RATE_ABUSE_WINDOW_SECONDS: "60"
     volumes:
       - nginx_logs:/var/log/nginx
       - nginx_dynamic:/shared-nginx

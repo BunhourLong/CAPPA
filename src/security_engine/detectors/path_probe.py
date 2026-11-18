@@ -4,7 +4,7 @@ from collections import defaultdict, deque
 from datetime import timedelta
 
 from src.core.http_models import DetectionAlert, HTTPLogEvent
-from src.security_engine.detectors.base import Detector
+from src.security_engine.detectors.base import Detector, is_static_asset
 
 
 class PathProbeDetector(Detector):
@@ -26,6 +26,9 @@ class PathProbeDetector(Detector):
         self._last_alert_at: dict[str, object] = {}
 
     def evaluate(self, event: HTTPLogEvent) -> list[DetectionAlert]:
+        if is_static_asset(event):
+            return []
+
         now = event.timestamp
 
         if event.status_code == 404:

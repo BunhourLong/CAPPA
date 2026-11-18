@@ -214,13 +214,15 @@ docker compose logs -f
 | Detector | Alert type | What it catches | Thresholds | Severity |
 |---|---|---|---|---|
 | **BruteForceDetector** | `brute_force` | Failed logins on `/login` | 5 failures (401/403) in 300 s | Medium |
-| **RateAbuseDetector** | `rate_abuse` | High request volume from one IP | 30 requests in 60 s | Medium |
+| **RateAbuseDetector** | `rate_abuse` | High dynamic-request volume from one IP (static assets excluded) | 30 requests in 60 s (`RATE_ABUSE_*`) | Medium |
 | **PayloadDetector** | `payload_sqli` | SQL injection in the decoded request target or user agent: `UNION SELECT`, `OR 1=1`, `DROP TABLE`, `information_schema`, SQL comment terminators | Pattern match | High |
 | **XSSPayloadDetector** | `xss_payload` | XSS signatures such as `<script>`, event handlers, `javascript:`, `<iframe>`, `eval(`, `document.cookie` | 13 patterns | High |
 | **CredentialStuffingDetector** | `credential_stuffing` | Auth failures spread across endpoints or user agents | 10 failures in 300 s, with 2+ endpoints or 3+ user agents | High if 3+ user agents, otherwise Medium |
 | **PathProbeDetector** | `404_spray` / `path_probe` | 404 spray and broad endpoint enumeration | 15 404s in 120 s, or 20 requests across 10+ unique paths in 120 s | Medium |
 | **ScrapingDetector** | `scraping` | Successful GET requests to many distinct endpoints | 50 GETs across 30+ unique endpoints in 60 s | Medium |
 | **UserAgentRotationDetector** | `user_agent_rotation` | User-agent cycling and generic bot clients | 5 distinct user agents in 300 s | High if a generic bot user agent is present, otherwise Medium |
+
+Rate-abuse limits are configurable with `RATE_ABUSE_THRESHOLD` and `RATE_ABUSE_WINDOW_SECONDS` (defaults: 30 dynamic requests in 60 s). Static assets, including dashboard bundles and their `/siem/assets/` form, do not count.
 
 ### Reputation Scoring
 

@@ -4,7 +4,7 @@ from collections import defaultdict, deque
 from datetime import timedelta
 
 from src.core.http_models import DetectionAlert, HTTPLogEvent
-from src.security_engine.detectors.base import Detector
+from src.security_engine.detectors.base import Detector, is_static_asset
 
 
 class ScrapingDetector(Detector):
@@ -26,6 +26,8 @@ class ScrapingDetector(Detector):
         self._last_alert_at: dict[str, object] = {}
 
     def evaluate(self, event: HTTPLogEvent) -> list[DetectionAlert]:
+        if is_static_asset(event):
+            return []
         if event.method != "GET":
             return []
         # Successful responses only — PathProbeDetector owns 404s
