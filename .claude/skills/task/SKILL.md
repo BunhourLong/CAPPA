@@ -20,10 +20,10 @@ You orchestrate and decide. Workers do the work. Stay cheap: give workers short,
 |---|---|---|
 | Find code | `delegate_task`: `research`, DeepSeek V4.1 Flash | same |
 | Write code | `delegate_task`: `implementation`, DeepSeek V4.1 Flash | same |
-| Review | `delegate_task`: `review`, MiniMax M3 | same, then Claude Sonnet `review`, plus Go Kimi K3 |
+| Review | `delegate_task`: `review`, MiniMax M3 | same, then Codex GPT-6 Astra `review`, plus Go Kimi K3 |
 | Write tests | `delegate_task`: `test`, Claude Haiku 5.5 | same |
 | Run tests | `task brief -- check` | same |
-| Pentest | `delegate_task`: `review`, MiniMax M3, with an attacker brief | same, then Claude Opus `review` |
+| Pentest | `delegate_task`: `review`, MiniMax M3, with an attacker brief | same, then Codex GPT-6.2 Astra `review` |
 
 Dispatch, isolation, review and report rules are in `.claude/run-task.md`.
 Briefs and frozen diffs go in `.delegate/` (ignored). Pass the brief's text in
@@ -37,14 +37,14 @@ stated. Never put `docs/security/` or customer data in one: a fix brief states
 the behaviour required, not the exploit. On a Go failure, retry once through
 the same provider with `opencode-go/claude-haiku-5-5` for writing, review and
 attack, or `opencode-go/deepseek-v4.1-flash` for tests. If Go is at its usage
-limit, go straight to the Claude worker routed in `.claude/run-task.md`. Never switch
+limit, go straight to the Codex worker routed in `.claude/run-task.md`. Never switch
 models silently.
 
 ## Pipeline
 1. **Load.** Read the task file. `rg --no-ignore -l '<module>' docs/tasks`, then read only those files' "Learned" sections. If a 🔒 item is undecided, record it in `docs/STATE.md` and skip to the next unblocked task; stop if there's none. Don't guess a 🔒 decision.
 2. **Branch** from up-to-date `main`: `git switch -c t-NNN-short-name`.
 3. **Write code** through a Go writer: put the goal, files, first failing test, acceptance checks and out-of-scope list in the brief. Read its diff, and confirm the test fails without the code. If it's wrong, delegate again with what to do differently; don't rewrite it yourself.
-4. **Review,** by tier, against the task's checks. Every reviewer gets the checks in its brief; a shared-checkout Claude reviewer may also read the task file. On blocking findings, delegate the fix with the findings, then review again.
+4. **Review,** by tier, against the task's checks. Every reviewer gets the checks in its brief; a shared-checkout Codex reviewer may also read the task file. On blocking findings, delegate the fix with the findings, then review again.
 5. **Write tests** through `delegate_task` (`test`, Claude Haiku 5.5). Read every test before running it: reject any that can't fail, only exercise mocks, or assert too little. A real failing test is a bug: send it to the code's writer, not back to the test.
 6. **Test:** `task brief -- check`, plus `task brief -- eval` if detection or scoring changed, plus any `task brief -- security:<name>` that `/verify` lists.
 7. **Pentest**, by tier. Save the report to `docs/security/T-NNN.md` (private). Docs-only changes skip this step and step 5, and config-only changes skip step 5 unless the task says otherwise. Review is never skipped.
