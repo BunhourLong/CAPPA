@@ -100,7 +100,7 @@ def is_static_asset(event: HTTPLogEvent) -> bool:
     segments = [segment.lower() for segment in event.endpoint.split("/") if segment]
     if not segments:
         return False
-    if any(segment in {".", ".."} or "%" in segment for segment in segments):
+    if any(segment in {".", ".."} or "%" in segment or ";" in segment for segment in segments):
         return False
     if any(_has_server_side_extension(segment) for segment in segments):
         return False

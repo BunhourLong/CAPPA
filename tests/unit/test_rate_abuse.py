@@ -99,6 +99,10 @@ def test_successful_asset_gets_are_static(target):
         "/api/v1/items.js",
         "/page/1.js",
         "/siem/api/ui/dashboard",
+        # Semicolon path parameters are parsed differently by each upstream server.
+        "/assets/x.jsp;.js",
+        "/assets/x.php;.js",
+        "/assets;v=1/app.js",
     ],
 )
 def test_ambiguous_or_dynamic_names_are_not_static(target):
@@ -232,6 +236,7 @@ def test_static_suffix_or_directory_does_not_exempt_a_dynamic_endpoint(target):
         "/siem/assets/upload.php.js",
         "/assets/upload.js.php",
         "/assets/config.json",
+        "/assets/x.jsp;.js",
     ],
 )
 def test_compound_server_side_asset_names_still_count(target):
