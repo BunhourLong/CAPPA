@@ -110,6 +110,23 @@ def test_missing_or_error_assets_are_not_static(status):
     assert not is_static_asset(_event("/assets/chunk-7A5B3C1D.js", status=status))
 
 
+def test_not_modified_asset_is_static():
+    assert is_static_asset(_event("/assets/app.js", status=304))
+
+
+@pytest.mark.parametrize("status", [301, 302, 303, 307, 308])
+def test_redirected_asset_is_not_static(status):
+    assert not is_static_asset(_event("/assets/app.js", status=status))
+
+
+def test_redirected_asset_burst_alerts_rate_abuse():
+    assert _rate_abuse_alerts(_burst("/assets/app.js", 30, seconds=30, status=302)) == ["rate_abuse"]
+
+
+def test_not_modified_asset_burst_does_not_alert_rate_abuse():
+    assert _rate_abuse_alerts(_burst("/assets/app.js", 105, seconds=180, status=304)) == []
+
+
 def test_static_asset_burst_does_not_alert_rate_abuse():
     detector = RateAbuseDetector()
 

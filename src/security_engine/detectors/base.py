@@ -94,7 +94,7 @@ def is_static_asset(event: HTTPLogEvent) -> bool:
     """True only for successful browser asset requests. Anything ambiguous counts as dynamic."""
     if event.method.upper() not in _STATIC_METHODS:
         return False
-    if not 200 <= event.status_code < 400:
+    if not (200 <= event.status_code < 300 or event.status_code == 304):
         return False
 
     segments = [segment.lower() for segment in event.endpoint.split("/") if segment]
