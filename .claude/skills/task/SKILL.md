@@ -22,9 +22,9 @@ You orchestrate and decide. Workers do the work. Stay cheap: give workers short,
 
 | Step | Low risk | Medium risk | High risk |
 |---|---|---|---|
-| Orchestrate, plan, check, gates | `antigravity` / `gemini-4-neon` (`thinking_level: low`) | `antigravity` / `gemini-4-neon` (`thinking_level: medium`) | `antigravity` / `gemini-4-neon` (`thinking_level: medium`) |
+| Orchestrate, plan, check, gates | `antigravity` / `gemini-4-neon` (`thinking_level: high`) | `antigravity` / `gemini-4-neon` (`thinking_level: high`) | `antigravity` / `gemini-4-neon` (`thinking_level: high`) |
 | Read-only search & research | **TEMP** `claudeAgent_2` / `claude-haiku-5-5` (`effort: high` if accepted) | same | same |
-| Write code, tests, fixes | **TEMP** `claudeAgent_2` / `claude-haiku-5-5` (`effort: high` if accepted) | `codex` / `gpt-6.2-sol` (`reasoningEffort: high`) | `antigravity` / `gemini-4-neon` (`thinking_level: medium`) |
+| Write code, tests, fixes | **TEMP** `claudeAgent_2` / `claude-haiku-5-5` (`effort: high` if accepted) | `codex` / `gpt-6.2-sol` (`reasoningEffort: high`) | `antigravity` / `gemini-4-neon` (`thinking_level: high`) |
 | Run tests, scans, eval | `task brief -- check` | same | same |
 | Review (1 fresh-context reviewer) | **TEMP** `claudeAgent_2` / `claude-sonnet-5-5` (`effort: high`) | **TEMP** `claudeAgent_2` / `claude-sonnet-5-5` (`effort: high`) | `codex` / `gpt-6.2-sol` (`reasoningEffort: high`) |
 

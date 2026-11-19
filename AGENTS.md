@@ -52,8 +52,8 @@ The user's locked routing is `.claude/workflow-locked.md` (do not reword, reorde
 
 | Job | Provider and model | Options |
 |---|---|---|
-| Main orchestrator (plan, briefs, diff check, gates, mutation checks, commits) | `antigravity` / `gemini-4-neon` | `thinking_level: low` (low tasks) / `thinking_level: medium` (medium & high-risk tasks); never `high`/`xhigh` |
-| Implementation, tests, fixes of high-risk tasks | `antigravity` / `gemini-4-neon` | `thinking_level: medium` |
+| Main orchestrator (plan, briefs, diff check, gates, mutation checks, commits) | `antigravity` / `gemini-4-neon` | `thinking_level: high` on every task; never `xhigh` |
+| Implementation, tests, fixes of high-risk tasks | `antigravity` / `gemini-4-neon` | `thinking_level: high` |
 | Review of high-risk tasks | `codex` / `gpt-6.2-sol` | `reasoningEffort: high` |
 | Implementation, tests, fixes of medium tasks | `codex` / `gpt-6.2-sol` | `reasoningEffort: high` |
 | Implementation, tests, fixes of low tasks | **TEMP** `claudeAgent_2` / `claude-haiku-5-5` (standing: `opencode` / `opencode-go/deepseek-v4.1-flash`, `variant: max`) | `effort: high` if accepted |
@@ -64,7 +64,7 @@ The user's locked routing is `.claude/workflow-locked.md` (do not reword, reorde
 Rules (verbatim from `.claude/workflow-locked.md` and `.claude/run-task.md`):
 - Workers start only through T3's native `delegate_task`, never through Claude native `Agent`, launcher scripts, CLI or API. Always set Codex `reasoningEffort: high` explicitly (T3 defaults to `low`).
 - Writer and reviewer must stay different models; one fresh-context reviewer per task.
-- Never use OpenCode models during this TEMPORARY override, never any Gemini model other than Gemini 4 Neon (and never `high`/`xhigh`), never GPT-6 Luna, GPT-6 Astra, GPT-6.2 Astra, GPT-6.1-*, or OpenCode free models.
+- Never use OpenCode models during this TEMPORARY override, never any Gemini model other than Gemini 4 Neon (and never `xhigh`), never GPT-6 Luna, GPT-6 Astra, GPT-6.2 Astra, GPT-6.1-*, or OpenCode free models.
 - **Limit / pause rule:** on any ChatGPT Plus or Claude Pro limit (or Go limit under standing routing), stage nothing new, record `Paused: <Plus|Claude|Go> limit`, the task id, what is finished and the brief path in `docs/STATE.md`, and stop. Never take over the worker's job or switch model, provider or plan. (A search limit means the main session searches itself.)
 - Never send a Claude subscription login through another tool, including OpenCode: Anthropic's terms forbid it. When OpenCode Go standing routing resumes, Go workers must use `isolation: "worktree"` so private untracked docs (`plan.md`, `docs/STATE.md`, `docs/tasks/`, `docs/security/`) stay local.
 
