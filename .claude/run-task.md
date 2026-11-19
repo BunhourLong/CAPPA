@@ -1,99 +1,46 @@
 # CyberSIEM task configuration
 
 Project configuration for the global `delikit` skill, and the dispatch rules
-`/task` follows. It wins where it differs from that skill.
+`/task` follows. It wins where it differs from that skill. The user's locked
+routing lives in `.claude/workflow-locked.md`.
 
-- Plan and next task: `docs/STATE.md`; the task file is `docs/tasks/T-NNN.md`.
-- Flow: the pipeline in `.claude/skills/task/SKILL.md` (tier, code, review, tests, test, pentest, fix, close, push, land). `/task` and `/delikit run-task` both follow it step for step. Review is never skipped.
-- Gates: `task brief -- check`, plus `task brief -- eval` when detection or scoring changed and the `/verify` scans the change needs.
-- Constraints: `AGENTS.md`; ponytail ultra, restated in every OpenCode and Antigravity brief because those workers run without the plugin. No Codex or GPT models; for Gemini models, only `gemini-4-neon` at `thinking_level: "high"`.
-- High risk: the diff touches auth, sessions, enforcement, scoring, client IP, proxy config, request or log parsing, or audit.
-- Review: every code change, by tier (routing below). The pentest follows the task skill.
-- Scratch: `.delegate/` (ignored) for briefs, frozen diffs and final reports. Read the report, not the transcript.
-- Git: commit the task branch before each dispatch; commit, push and land as the task skill says. No AI attribution.
-- Close: the task file and `docs/STATE.md`; stop after one task.
+- Plan and next task: `docs/STATE.md`; the task file is `docs/tasks/T-NNN.md` (long-form plan: `plan.md`, read only the section a task cites).
+- Notes: each task file's `## Learned` and `## Follow-ups` sections; decisions in `docs/adr/`.
+- Gates: `task brief -- check` (lint + Python tests + `task eval` + frontend tests + build), plus `task brief -- eval` when detection or scoring changed and the `/verify` scans (`task brief -- security:<name>`) the change needs.
+- Focused test: `task test -- tests/unit/test_x.py`; integration: `task test -- tests/integration/test_x.py`.
+- Constraints: `AGENTS.md` (TDD, ponytail `ultra`, invariants 1–9) and `.claude/rules/` (`python.md`, `frontend.md`, `infra.md`). Workers get no conversation history and Antigravity/Codex workers skip `.claude/settings.json` hooks and `.claude/rules/`: every brief quotes the rules that apply (including ponytail `ultra`, matching `.claude/rules/` files, and any graph/query tool or gotchas files if present) and names exact `path:line` ranges and values. Never touch unrelated user files; stage by explicit path. One task per session.
+- Start: another task's changes still staged → ask the user what to do with them first. An undecided `🔒` item in `docs/STATE.md` or `docs/tasks/T-NNN.md` the task depends on → record it and skip or ask; don't guess.
+- Size: more than one behaviour or invariant, or past ~400 production lines → propose a split into new tasks. Never split a transaction, or a migration from the code that needs it.
+- Risk tiers:
+  - **High risk**: touches auth, sessions, enforcement, scoring, client IP, proxy config, request or log parsing, or audit.
+  - **Medium risk**: feature, API, engine, or database work outside the high-risk list.
+  - **Low risk**: docs, config, tests of existing behaviour, small UI tweaks, Docker/CI chores, and mechanical refactors.
+- High-risk two-half flow: Low and medium tasks run straight through; a high-risk task runs in two halves:
+  1. **Think, no code.** Read the code the task touches (delegating codebase search via the search row below) until the cause or design is confirmed at `path:line`; settle what the task leaves open with a recommendation; find the races, transaction boundaries, failure cases and migration, and any trap in the obvious approach (a test gate that can't hold, a lock-order break). Save a one-page plan at `.delegate/<date>-T-NNN.md`, then end the turn with a `/goal` prompt for the user. The user sending it back is the plan's approval.
+  2. **The prompt** carries what the thinking added, never the task file reworded: the confirmed mechanism, the decision and why, the red test's exact shape (gate, assertions, the failure it must show first), the smallest fix and what must not change, mutation checks, traps. Under ~30 lines, standalone after `/clear`, starts with `delikit run-task T-NNN`, and is saved as the plan's last section. Its done condition is this file's Close, OR a stop this file requires recorded in `docs/STATE.md` (`Paused`, `BLOCKED`, `Resuming`, a failing gate with no known cause); never rerun, skip or weaken a test to reach done.
+  3. Under that `/goal`, dispatch the high-risk writer (Worker routing: `antigravity` / `gemini-4-neon`, `thinking_level: medium`, via `delegate_task`) with TDD, ponytail `ultra`, matching `.claude/rules/`, and the matching personal skill (`security-audit`, `concurrency-test`, `new-detector`) in its brief; the main session checks the diff, runs the gates and mutation checks, then the high-risk reviewer (Worker routing: `codex` / `gpt-6.2-sol`, `reasoningEffort: high`) reviews it.
+
+  Low and medium tasks go straight to the writer for their risk (Worker routing), brief saved in `.delegate/T-NNN-writer.md`.
+- Checking writer code: read the whole diff (including untracked new files) against the requirements; confirm the red test fails without the code, and for each new guard or branch, revert it by hand and see a test go red, then restore it. Run the gates yourself. Defects go back to the same writer; never fix its code yourself. At most 2 rounds, then `BLOCKED` in `docs/STATE.md`.
+- Review: every task except a one-file fix with an obvious test. One fresh-context reviewer per task (Worker routing: high-risk → `codex` / `gpt-6.2-sol`; medium/low → `claudeAgent_2` / `claude-sonnet-5-5` TEMP) on the full diff frozen under `.delegate/T-NNN.diff` (`git diff --cached --binary > .delegate/T-NNN.diff` or `git diff main...HEAD > .delegate/T-NNN.diff`), correctness only: requirements, edge cases, tests that catch regressions, `AGENTS.md` invariants/races/transaction boundaries, and security (IDOR, missing auth guard, unbounded queries; for auth, sessions, enforcement, client IP or proxy diffs also the matching `security-audit` checklist, saving any private findings in `docs/security/T-NNN.md`). Each finding with `path:line` and the failing input. At most 2 fix rounds.
+- Briefs & isolation: save briefs and frozen diffs in `.delegate/` (ignored). Pass the brief's text in `task`, under ~400 words, with five headings (`Goal`, `Context`, `Do`, `Don't`, `Done when`), and never include `docs/security/`, secrets, customer data or exploit recipes. Call `orchestrator_capabilities` once per session before the first `delegate_task`. Non-Go workers run through `delegate_task` in the main checkout (one writer at a time) or `isolation: "worktree"` for parallel writers; when OpenCode Go standing routing is active, Go workers must use `isolation: "worktree"` so private untracked docs (`plan.md`, `docs/STATE.md`, `docs/tasks/`, `docs/security/`) stay local.
+- Limit: a worker that fails on a ChatGPT Plus, Claude Pro or OpenCode Go usage limit → stage nothing new, record `Paused: <Plus|Claude|Go> limit`, the task id, what is finished and the brief path in `docs/STATE.md`, and stop. Never take over its work or switch model, provider or plan. A new session dispatches the brief again. (A search limit means the main session searches itself.)
+- Budget: past ~50 tool calls, finish the current green step and stage it; record the remaining work and `Resuming T-NNN: ...` in `docs/STATE.md`, then stop.
+- Branch & Git: keep CyberSIEM's branch and landing policy from `AGENTS.md` — one branch per task from up-to-date `main` as `t-NNN-short-name` (`chore/short-name` for workflow/config work with no task), stage by explicit path, Conventional Commits ending in `(T-NNN)` (no `(T-NNN)` on chores), no AI attribution, never force-push or `git add -f`. Push (`task ship`), watch required CI (`check`, `secrets`, `rules`, `code`, `workflows`), then fast-forward land on `main` and delete the task branch.
+- Close: tick the task's acceptance checks, set `Status: done`, fill in `Learned` and `Follow-ups` in `docs/tasks/T-NNN.md`, rewrite `docs/STATE.md` (under 40 lines, naming the next task and its risk), commit, push and land; stop after one task with "`/clear`, then `delikit run-task`".
 
 ## Worker routing
 
-Workers start only through T3's native `delegate_task`: no dispatch script, CLI
-integration or new service. Call `orchestrator_capabilities` once per session
-before the first one. The tiers and backups are in `AGENTS.md` "Model routing".
-Delegate file reading, searching and basic scraping to `glm-5.3-flash` instead
-of spending orchestrator tokens reading large files directly.
+| Job | Provider and model | Options |
+| --- | --- | --- |
+| Main orchestrator (plan, briefs, diff check, gates, mutation checks, commits) | `antigravity` / `gemini-4-neon` | `thinking_level: low` (low tasks) / `thinking_level: medium` (medium & high-risk tasks); never `high`/`xhigh` |
+| Implementation, tests, fixes of high-risk tasks | `antigravity` / `gemini-4-neon` | `thinking_level: medium` |
+| Review of high-risk tasks | `codex` / `gpt-6.2-sol` | `reasoningEffort: high` |
+| Implementation, tests, fixes of medium tasks | `codex` / `gpt-6.2-sol` | `reasoningEffort: high` |
+| Implementation, tests, fixes of low tasks | **TEMP** `claudeAgent_2` / `claude-haiku-5-5` (standing: `opencode` / `opencode-go/deepseek-v4.1-flash`, `variant: max`) | `effort: high` if accepted |
+| Review of medium and low tasks | **TEMP** `claudeAgent_2` / `claude-sonnet-5-5` (standing: `opencode` / `opencode-go/glm-5.3-flash`, `variant: max`) | `effort: high` |
+| Read-only codebase search & basic research (returns `path:line`) | **TEMP** `claudeAgent_2` / `claude-haiku-5-5` (standing: `opencode` / `opencode-go/deepseek-v4.1-flash` or `opencode-go/glm-5.3-flash`, `variant: max`) | `effort: high` if accepted |
 
-| Job | `role` | `target` |
-|---|---|---|
-| Read, find code, basic scraping | `research` | `opencode`, `opencode-go/glm-5.3-flash`, `options: {variant: "max"}` |
-| Write code, chores, apply fixes | `implementation` | `opencode`, `opencode-go/deepseek-v4.1-flash`, `options: {variant: "max"}` |
-| Complex / stuck high-risk fixes | `implementation` | enabled Claude instance, `claude-sonnet-5-5`, `options: {effort: "high"}` |
-| Write tests | `test` | `opencode`, `opencode-go/claude-haiku-5-5`, `options: {variant: "max"}` |
-| Review the diff | `review` | `opencode`, `opencode-go/glm-5.3-flash`, `options: {variant: "max"}` |
-| Attack the change | `review` | same |
-| High-risk second review | `review` | enabled Claude instance, `claude-sonnet-5-5`, `options: {effort: "high"}` |
-| High-risk attack | `review` | enabled Claude instance, `claude-sonnet-5-5`, `options: {effort: "high"}` |
-| High-risk Go second opinion | `review` | `opencode`, `opencode-go/glm-5.3`, `options: {variant: "max"}` |
+**The user's locked workflow is `.claude/workflow-locked.md`: never reword it. The TEMP rows are its OpenCode Go override (user, 2026-11-19, until Go resets ~2026-12-02); when the user says Go has reset, replace each TEMP model with its standing one in the parentheses and delete the TEMP marker. Where standing prose conflicts, the TEMP rows win.**
 
-For Claude, take the enabled instance's id and option names from
-`orchestrator_capabilities` (for example `claudeAgent_2`), never a guess. Never
-use Codex or GPT models; for Gemini models, only `antigravity` `gemini-4-neon`
-with `options: {thinking_level: "high"}`. These are routing defaults, not
-guarantees of access: if a model is unavailable, report it and ask for a routing
-change instead of substituting silently.
-
-## Briefs
-
-Delegate scouting to `glm-5.3-flash` before reading, then write a self-contained brief in `.delegate/` with
-five headings: Goal, Context, Do, Don't, Done when. Give exact `path:line`,
-numbered requirements, the cases and commands that prove it, the project
-invariants that apply, and the report format below. Workers get no conversation
-history and must not pick another task or delegate further. Pass the brief's
-text in `task`, not its path: a worktree child cannot see ignored files. Keep it
-under about 400 words and never include `docs/security/`, customer data or an
-exploit recipe; a fix brief states the behaviour required, not the attack.
-
-Workers have no approval channel in a background run: grant no permission
-bypass, set no `runtimeMode` above the session's, and tell scouts and reviewers
-not to edit files. The Claude role checklists in `.claude/agents/` stay for
-Claude Code sessions; a T3 brief restates what it needs, because `delegate_task`
-does not select an agent profile.
-
-## Isolation
-
-Go workers always use `isolation: "worktree"`: Go keeps requests for 30 days, so
-a Go worker sees only the public committed checkout, never `plan.md`,
-`docs/STATE.md`, `docs/tasks/` or `docs/security/`. Commit the task branch
-before each dispatch; a worktree starts from the committed HEAD and drops
-uncommitted edits. Claude and Antigravity workers may use `isolation: "shared"` on a checkout
-with no unrelated changes. Parallel writers always get separate worktrees. If
-the checkout contains user work you must not touch, stop and ask before applying
-or committing anything.
-
-## Read, review, confirm
-
-1. **Read, then run.** Find the child's checkout (`git worktree list`, or
-   `t3_worktree_list` with its `childThreadId`) and read the whole change before
-   running anything, untracked new files included (`git status --short`): tests
-   execute what the worker wrote. Run the brief's checks yourself. Send a
-   failure back with the failing command and the expected result. At most two
-   failed repair rounds, then report the unresolved issue; no silent model
-   fallback. Each repair or review round is a new `delegate_task`, with the
-   earlier findings in its brief.
-2. **Freeze and review.** Apply only this task's change to a clean task
-   checkout and commit it on the task branch. Freeze it under `.delegate/`,
-   untracked new files included, without staging the user's work. In the child
-   checkout:
-   `git add -A && git diff --cached --binary HEAD > <repo>/.delegate/<task>.diff`,
-   then `git reset`. Send it to a different model for independent review:
-   GLM-5.3-Flash on every change, and on high risk then Claude Sonnet 5.5 plus Go
-   GLM-5.3 (`AGENTS.md` "Model routing"). A
-   shared-checkout reviewer gets the frozen diff; a worktree reviewer reads
-   `git diff <base>...HEAD` from the committed task branch, so name the base
-   ref. Scouts and reviewers never edit files.
-3. **Confirm.** Judge every finding against a real case; a confirmed bug gets a
-   regression test and a fix, a false one is dropped with the reason. Run the
-   gates after the last fix, read the final diff, and report results.
-
-Reports: a writer returns `STATUS: DONE | PARTIAL | BLOCKED`, `CHANGED`, `RAN`,
-`RESULT` and `OPEN`; a scout `ANSWER` and `EVIDENCE` with `path:line`; a
-reviewer `VERDICT: PASS | FINDINGS`, then each finding with `path:line`, the
-failing case and a proposed regression check.
+Through T3 `delegate_task`, in the main checkout (one writer at a time). The main orchestrator and the high-risk writer are both `antigravity` / `gemini-4-neon` (and only those two; never `high`/`xhigh`), and the orchestrator still delegates every writer, reviewer and search job to the rows above. High-risk tasks are reviewed by `codex` / `gpt-6.2-sol` (`reasoningEffort: high`) so writer and reviewer stay different models. Every Antigravity brief explicitly includes ponytail `ultra`, matching `.claude/rules/` files, and any project graph/query tool or gotchas files if present. Always set Codex `reasoningEffort: high` explicitly (T3 defaults to `low`). Never use OpenCode models during this override, never any Gemini model other than Gemini 4 Neon, never GPT-6 Luna, GPT-6 Astra, GPT-6.2 Astra, GPT-6.1-*, OpenCode free models, Claude native `Agent` subagents, or launcher scripts. Still one fresh-context reviewer per task. A Plus, Claude or Go limit pauses the task per Limit (a search limit means the main session searches itself). Gates run through `task brief` with no model.
