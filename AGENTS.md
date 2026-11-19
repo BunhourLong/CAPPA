@@ -35,38 +35,38 @@ Long-form plan: `plan.md`. Do NOT read it whole; read only the section a task ci
 
 ## Workflow
 - Session start: read `docs/STATE.md` (now, next task and why, pending decisions, risks). No other memory system: state lives there, decisions in `docs/adr/`, lessons in each task's "Learned".
-- Work comes from `docs/tasks/T-NNN.md`. `/task` runs the next task, `/task T-NNN` a named one, `/task P1` plans a phase. Stay in scope; list follow-ups instead of doing them.
-- Pipeline, for every code change (`/task` has the details): write code → review → write tests → test → pentest → fix from feedback → push. Review is never skipped.
-- The main session orchestrates and decides; it doesn't read or write what an agent can. Pass paths, not contents, except the brief itself.
+- Work comes from `docs/tasks/T-NNN.md`. `/delikit run-task` runs the next task, `/delikit run-task T-NNN` a named one, `/task P1` plans a phase. Stay in scope; list follow-ups instead of doing them.
+- Pipeline, for every code change (`.claude/run-task.md` has the details): write code → review → write tests → test → pentest → fix from feedback → push. Review is never skipped.
+- The main session orchestrates and decides; it doesn't read, scrape or write what a cheap subagent can. Delegate file reading, searching and basic scraping to Go `glm-5.3-flash`, and pass paths, not contents, except the brief itself.
 - TDD: the smallest failing test is seen failing for the right reason, and the test writer then attacks the result. One worker writes the test and the code together, and the main session confirms the test fails without the code before trusting it. A bug fix starts with a test that reproduces it. A guard test that passes first time proves nothing until removing the guard makes it fail.
-- Every agent that writes or reviews code runs ponytail ultra: `.claude/settings.json` sets the level, the plugin's hooks carry it to Claude sessions, a Codex orchestrator loads the `ponytail` skill at ultra, and every delegate brief restates it for Codex and OpenCode workers, which run without the plugin. It never overrides tests, validation, security or the invariants above.
+- Every agent that writes or reviews code runs ponytail ultra: `.claude/settings.json` sets the level, the plugin's hooks carry it to Claude sessions, a Gemini (Antigravity) orchestrator loads the `ponytail` skill at ultra, and every delegate brief restates it for OpenCode and Antigravity workers, which run without the plugin. It never overrides tests, validation, security or the invariants above.
 - Done = pipeline passed + acceptance checks met + `docs/STATE.md` updated + required CI green on the pushed branch.
 - Expensive to reverse → `/adr`, mark 🔒 in the task, and wait for me. Don't guess; move on to another unblocked task.
 - Pentest reports stay in `docs/security/` (private), never in commits, PRs or public docs.
 - Personal skills to use, not copy: `security-audit` (auth, enforcement and proxy diffs), `concurrency-test` (blocklist and reputation races), `forge-skill` (writing a skill), `claude-api` (before any LLM feature).
 
 ## Model routing
-From two bakeoffs on this repo (T-052, 2026-11-04): one run per model, so a rough signal. Details: plan.md §10. Since 2026-11-18 Codex orchestrates instead of Claude, and Claude seats are replaced by Codex (Claude Haiku through Go stays); to go back, restore the routing from tag `workflow-claude-orchestrator`.
+From two bakeoffs on this repo (T-052, 2026-11-04): one run per model, so a rough signal. Details: plan.md §10. Don't use Codex, ChatGPT or any GPT model. For Gemini models, only use Gemini 4 Neon on `thinking_level: high` — never Argon, Hydrogen, Flash or other thinking levels. Previous orchestrator setups remain saved in git: tag `workflow-claude-orchestrator` (`de5bee4`, Claude Opus) and commit `b1f6b32` (Codex).
 
 | Step | Low risk | High risk (auth, enforcement, scoring, client IP, proxy, parsing, audit) |
 |---|---|---|
-| Orchestrate, plan, judge findings | Codex: GPT-6.2 Astra, `reasoningEffort: high`, main session | same |
-| Find code, chores | Go: DeepSeek V4.1 Flash | same |
-| Write code, apply fixes | Go: DeepSeek V4.1 Flash | same |
-| Review the diff | Go: MiniMax M3 | same, then Codex: GPT-6 Astra (`review`), plus Go: Kimi K3 |
+| Orchestrate, plan, judge findings | Antigravity: Gemini 4 Neon, `thinking_level: high`, main session | same |
+| Read, find code, basic scraping | Go: GLM-5.3-Flash | same |
+| Write code, chores, apply fixes | Go: DeepSeek V4.1 Flash | same (escalate to Claude Sonnet 5.5 if stuck on complex high-risk work) |
+| Review the diff | Go: GLM-5.3-Flash | same, then Claude Sonnet 5.5 (`review`), plus Go: GLM-5.3 |
 | Write tests | Go: Claude Haiku 5.5 | same |
 | Run tests, scans, eval | No model: `task brief` | same |
-| Attack the change | Go: MiniMax M3 | same, then Codex: GPT-6.2 Astra (`review`) |
+| Attack the change | Go: GLM-5.3-Flash | same, then Claude Sonnet 5.5 (`review`) |
 
-The orchestrator writes no code unless a fallback applies: the main session reads each worker's summary and diff, and sends bad work back with what to do differently. Workers start through T3's native `delegate_task` (rules in `.claude/run-task.md`, which `/task` and the global `delikit` skill follow), never through a shell script, CLI or API. Go models run at `variant: max`.
+The orchestrator writes no code and avoids reading files directly unless a fallback applies: delegate file reading/scraping to Go `glm-5.3-flash`, read each worker's concise summary and diff, and send bad work back with what to do differently. Workers start through T3's native `delegate_task` (rules in `.claude/run-task.md`, which `/task` and the global `delikit` skill follow), never through a shell script, CLI or API. Go models run at `variant: max`.
 
-Backups through the same routing: `opencode-go/claude-haiku-5-5` for writing, review and attack, `opencode-go/deepseek-v4.1-flash` for tests, `opencode-go/glm-5.3` for Kimi K3. When Go is down or at its limit, delegate the same brief to Codex as `gpt-6-astra` (find, chores, tests, write, review) or `gpt-6.2-astra` (high-risk review and attack). Never substitute silently.
+Backups through the same routing: `opencode-go/deepseek-v4.1-flash` or `opencode-go/claude-haiku-5-5` for GLM-5.3-Flash (reading, review, attack), `opencode-go/glm-5.3-flash` or `opencode-go/claude-haiku-5-5` for DeepSeek V4.1 Flash (writing, chores), `opencode-go/deepseek-v4.1-flash` or `opencode-go/glm-5.3-flash` for tests, and `opencode-go/kimi-k3` for GLM-5.3. When Go is down or at its limit, delegate the same brief to the enabled Claude instance as `claude-haiku-5-5` (find, chores, tests) or `claude-sonnet-5-5` (`effort: high`, write, review, attack). If Claude is unavailable, use `antigravity` `claude-sonnet-5-5` or `gemini-4-neon` (both `thinking_level: high`). Never substitute silently.
 
 Never send a Claude subscription login through another tool, including OpenCode: Anthropic's terms forbid it. Claude Haiku 5.5 through OpenCode Go is fine: it's Go's own metered access, not that login. Go keeps its requests for 30 days, so Go workers always run with `delegate_task` isolation `worktree`: a committed checkout with no `plan.md`, `docs/STATE.md`, `docs/tasks/` or `docs/security/`.
 
 ## Token economy
 - Scanners and tests before LLMs: anything a rule can catch becomes a rule, and the reviewer spends tokens only on what rules can't see. A passing test run costs no model tokens.
-- Cheap models write, strong models judge. Codex's limit goes to orchestrating and to the final review and pentest of high-risk changes; volume goes to Go models. The orchestrator is the most expensive seat, so it delegates and keeps its own context small.
+- Cheap models read and write, strong models judge. Gemini 4 Neon (`high`) is reserved for orchestrating, planning and judging findings, and Claude Sonnet 5.5 (`high`) for high-risk second review, high-risk pentests and hard high-risk escalations; reading, scraping, coding and first-pass reviews go to Go models (`glm-5.3-flash`, `deepseek-v4.1-flash`, `claude-haiku-5-5`, `glm-5.3`). The orchestrator is expensive, so it delegates reads and keeps its own context small.
 - Every OpenCode run starts with about 3k tokens of overhead, so ask for one job per run, not many small ones. Premium Go models get only the reviews that need them.
 - Workers start with no history. Give each a short, self-contained brief and a capped reply. Each repair or review round is a new `delegate_task`; put the prior feedback in its brief.
 - Read with line ranges. `src/api/main.py` and `src/security_engine/repository.py` are large: grep first.
