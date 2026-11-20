@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import math
 import os
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -106,6 +108,36 @@ def _parse_int_env(name: str, default: int) -> int:
         return default
 
 
+def positive_int_env(name: str, default: int) -> int:
+    """Env-backed int that must be > 0; invalid config fails instead of falling back."""
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    try:
+        value = int(raw_value)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be an integer, got {raw_value!r}") from exc
+    if value <= 0:
+        raise ValueError(f"{name} must be > 0, got {raw_value!r}")
+    return value
+
+
+def positive_float_env(name: str, default: float) -> float:
+    """Env-backed float that must be > 0; invalid config fails instead of falling back."""
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    try:
+        value = float(raw_value)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a number, got {raw_value!r}") from exc
+    if value <= 0:
+        raise ValueError(f"{name} must be > 0, got {raw_value!r}")
+    if not math.isfinite(value):
+        raise ValueError(f"{name} must be a finite number, got {raw_value!r}")
+    return value
+
+
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -151,6 +183,11 @@ class ReputationConfig:
     )
     decay_grace_seconds: int = field(default_factory=lambda: _parse_int_env("REPUTATION_DECAY_GRACE_SECONDS", 900))
     decay_per_hour: float = field(default_factory=lambda: _parse_float_env("REPUTATION_DECAY_PER_HOUR", 8.0))
+    # Only alerts created within this window contribute to current_score. Older alerts that would
+    # still trigger the alert hold are tracked separately (see older_hold_alert_ids).
+    scoring_window_seconds: int = field(
+        default_factory=lambda: positive_int_env("REPUTATION_SCORING_WINDOW_SECONDS", 86400)
+    )
     streak_reset_seconds: int = field(default_factory=lambda: _parse_int_env("REPUTATION_STREAK_RESET_SECONDS", 3600))
     repeated_medium_alert_count: int = field(
         default_factory=lambda: _parse_int_env("REPUTATION_REPEATED_MEDIUM_ALERT_COUNT", 3)
@@ -257,6 +294,7 @@ class IPReputationRecord:
     unresolved_alert_count: int = 0
     malicious_alert_count: int = 0
     alert_hold_active: bool = False
+    last_scored_alert_id: int | None = None
     updated_at: datetime | None = None
     reputation_reasons: list[str] = field(default_factory=list)
 
@@ -314,6 +352,9 @@ def build_record_from_row(row: dict | None) -> IPReputationRecord | None:
         unresolved_alert_count=int(row.get("unresolved_alert_count") or 0),
         malicious_alert_count=int(row.get("malicious_alert_count") or row.get("malicious_count") or 0),
         alert_hold_active=bool(row.get("alert_hold_active", False)),
+        last_scored_alert_id=(
+            int(row["last_scored_alert_id"]) if row.get("last_scored_alert_id") is not None else None
+        ),
         updated_at=ensure_utc(row.get("updated_at")),
         reputation_reasons=list(row.get("reputation_reasons") or []),
     )
@@ -365,6 +406,7 @@ def evaluate_ip_reputation(
     config: ReputationConfig | None = None,
     trigger_reason: str = "recalculated",
     source_alert_ids: list[int] | None = None,
+    older_hold_alert_ids: Sequence[int] = (),
 ) -> IPReputationEvaluation:
     config = config or ReputationConfig()
     now = ensure_utc(now) or utc_now()
@@ -376,21 +418,31 @@ def evaluate_ip_reputation(
     malicious_alert_count = sum(1 for alert in alert_evidence if alert.status == "malicious")
     alert_count = len(alert_evidence)
 
+    # Alerts older than the scoring window do not contribute score, but an unresolved/malicious
+    # one that meets the hold threshold keeps the alert hold alive (and stays the block's source).
+    older_hold_ids = [int(alert_id) for alert_id in older_hold_alert_ids if alert_id is not None]
+
     # Hold is active while any non-safe alert meets the actionable threshold, and clears once none does.
-    new_alert_hold = any(
+    new_alert_hold = bool(older_hold_ids) or any(
         a.status in {"unresolved", "malicious"}
         and (config.weight_for_alert(a.alert_type, a.severity) >= ALERT_HOLD_MIN_WEIGHT or a.severity == "high")
         for a in alert_evidence
     )
 
     current_score = 0.0
-    lifetime_score = 0.0
+    window_lifetime = 0.0
+    newly_scored_lifetime = 0.0
     offense_streak = 0
     repeated_medium_count = 0
     critical_alert_ids: list[int] = []
     contributing_alert_ids: list[int] = []
     recent_active_alerts: list[AlertEvidence] = []
     previous_active_alert_time: datetime | None = None
+
+    last_scored_alert_id = previous_record.last_scored_alert_id
+    # Incremental lifetime accounting is only possible when every alert carries an id and the
+    # previous record recorded how far scoring reached.
+    trackable = last_scored_alert_id is not None and all(a.alert_id is not None for a in alert_evidence)
 
     for alert in alert_evidence:
         base_weight = config.weight_for_alert(alert.alert_type, alert.severity)
@@ -408,7 +460,10 @@ def evaluate_ip_reputation(
 
         multiplier = _repeat_multiplier(alert_streak if is_active else 1, config)
         weighted_score = _round_score(base_weight * multiplier)
-        lifetime_score += weighted_score
+        positive_weight = max(0.0, weighted_score)
+        window_lifetime += positive_weight
+        if trackable and alert.alert_id > last_scored_alert_id:
+            newly_scored_lifetime += positive_weight
 
         if not is_active:
             continue
@@ -448,7 +503,18 @@ def evaluate_ip_reputation(
         offense_streak = 0
 
     current_score = _round_score(current_score)
-    lifetime_score = _round_score(lifetime_score)
+    window_max_alert_id = max((a.alert_id for a in alert_evidence if a.alert_id is not None), default=None)
+    if trackable:
+        # Only alerts scored since the watermark add to the running lifetime total.
+        lifetime_score = _round_score(previous_record.lifetime_score + newly_scored_lifetime)
+        new_last_scored_alert_id = (
+            max(last_scored_alert_id, window_max_alert_id) if window_max_alert_id is not None else last_scored_alert_id
+        )
+    else:
+        # Without a watermark (or with unidentifiable alerts) keep the higher of the two totals.
+        lifetime_score = _round_score(max(previous_record.lifetime_score, window_lifetime))
+        new_last_scored_alert_id = window_max_alert_id if window_max_alert_id is not None else last_scored_alert_id
+
     raw_state = config.state_for_score(current_score)
     threshold_reached = current_score >= config.blocked_threshold
 
@@ -462,13 +528,15 @@ def evaluate_ip_reputation(
     blocked_reason: str | None = None
     current_state = raw_state
 
-    if analyst_override == "suppress_auto_block" and cooldown_until and cooldown_until <= now:
-        analyst_override = None
+    # An expired cooldown is dead state: clear it so the row stops matching
+    # `cooldown_until IS NOT NULL` forever. Overrides that only live as long as
+    # their cooldown (suppress_auto_block, force_unblock) end with it.
+    cooldown_expired = bool(cooldown_until and cooldown_until <= now)
+    if cooldown_expired:
         cooldown_until = None
 
-    if analyst_override == "force_unblock" and cooldown_until and cooldown_until <= now:
+    if analyst_override in {"suppress_auto_block", "force_unblock"} and cooldown_expired:
         analyst_override = None
-        cooldown_until = None
 
     if blocked_until and blocked_until <= now and previous_record.current_state == "blocked":
         blocked_until = None
@@ -573,6 +641,9 @@ def evaluate_ip_reputation(
             effective_source_alert_ids = critical_alert_ids
         else:
             effective_source_alert_ids = contributing_alert_ids[-5:]
+    if alert_hold_active and older_hold_ids:
+        # The hold is (partly) carried by older evidence: keep it on the block's audit trail.
+        effective_source_alert_ids = list(dict.fromkeys([*effective_source_alert_ids, *older_hold_ids]))
 
     return IPReputationEvaluation(
         ip=ip,
@@ -598,6 +669,7 @@ def evaluate_ip_reputation(
         unresolved_alert_count=unresolved_alert_count,
         malicious_alert_count=malicious_alert_count,
         alert_hold_active=alert_hold_active,
+        last_scored_alert_id=new_last_scored_alert_id,
         updated_at=now,
         reputation_reasons=list(dict.fromkeys(reasons)),
         score_before=_round_score(previous_record.current_score),

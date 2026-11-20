@@ -197,7 +197,7 @@ def _serialize_blocked_ip(record: dict) -> BlockedIPResponse:
     payload["alert_hold_active"] = bool(payload.get("alert_hold_active", False))
     unresolved = int(payload.get("unresolved_alert_count") or 0)
     malicious = int(payload.get("malicious_alert_count") or 0)
-    payload["unblock_eligible"] = unresolved == 0 and malicious == 0
+    payload["unblock_eligible"] = not payload["alert_hold_active"] and unresolved == 0 and malicious == 0
     payload["reputation_reasons"] = list(payload.get("reputation_reasons") or [])
     payload["block_countdown_seconds"] = _seconds_until(payload.get("blocked_until"))
     payload["cooldown_countdown_seconds"] = _seconds_until(payload.get("cooldown_until"))
@@ -417,10 +417,6 @@ def _seconds_until(timestamp: datetime | None) -> int | None:
     return int(ceil(remaining))
 
 
-def _refresh_reputation_views(trigger_reason: str) -> None:
-    enforcement_service.refresh_known_ip_states(trigger_reason=trigger_reason)
-
-
 def _build_dashboard_stats(hours: int) -> DashboardStats:
     return DashboardStats(
         alert_type_counts=[
@@ -613,6 +609,11 @@ def startup() -> None:
     _seed_default_admin()
 
 
+@app.on_event("shutdown")
+def shutdown() -> None:
+    repository.close()
+
+
 def _seed_default_admin() -> None:
     import sys as _sys
 
@@ -680,7 +681,6 @@ def alerts_page(
     _, err = _require_analyst(request)
     if err:
         return err
-    _refresh_reputation_views(trigger_reason="alerts_page_refresh")
     return _list_serialized_alerts(
         limit=limit,
         offset=offset,
@@ -710,7 +710,6 @@ def dashboard_view(request: Request, limit: Limit = DEFAULT_ALERT_LIMIT):
     _, err = _require_user(request)
     if err:
         return err
-    _refresh_reputation_views(trigger_reason="dashboard_view_refresh")
     statuses = Counter(alert["status"] for alert in repository.list_alerts(limit=limit))
     return DashboardViewResponse(
         analytics=_build_dashboard_stats(hours=24),
@@ -749,7 +748,6 @@ def alerts_view(
     _, err = _require_analyst(request)
     if err:
         return err
-    _refresh_reputation_views(trigger_reason="alerts_view_refresh")
     return AlertsViewResponse(
         alerts=_list_serialized_alerts(
             limit=limit,
@@ -779,7 +777,6 @@ def list_alerts(
     _, err = _require_analyst(request)
     if err:
         return err
-    _refresh_reputation_views(trigger_reason="alerts_api_refresh")
     return _list_serialized_alerts(
         limit=limit,
         offset=offset,
@@ -804,7 +801,6 @@ def list_blocked_ips(request: Request):
     _, err = _require_analyst(request)
     if err:
         return err
-    _refresh_reputation_views(trigger_reason="blocked_ip_list_refresh")
     return [_serialize_blocked_ip(record) for record in repository.list_blocked_ips()]
 
 
@@ -903,7 +899,6 @@ def get_alert(alert_id: int, request: Request):
     _, err = _require_analyst(request)
     if err:
         return err
-    _refresh_reputation_views(trigger_reason="alert_detail_refresh")
     alert = repository.get_alert(alert_id)
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")

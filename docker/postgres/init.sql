@@ -35,6 +35,9 @@ CREATE INDEX IF NOT EXISTS idx_alerts_created_at ON alerts (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_alerts_status ON alerts (status);
 CREATE INDEX IF NOT EXISTS idx_alerts_type ON alerts (type);
 CREATE INDEX IF NOT EXISTS idx_alerts_ip_created_at ON alerts (ip, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_alerts_hold_lookup
+    ON alerts (ip, severity, type, created_at)
+    WHERE status IN ('unresolved', 'malicious');
 
 CREATE TABLE IF NOT EXISTS ip_reputations (
     ip INET PRIMARY KEY,
@@ -53,6 +56,7 @@ CREATE TABLE IF NOT EXISTS ip_reputations (
     unresolved_alert_count INTEGER NOT NULL DEFAULT 0,
     malicious_alert_count INTEGER NOT NULL DEFAULT 0,
     alert_hold_active BOOLEAN NOT NULL DEFAULT FALSE,
+    last_scored_alert_id BIGINT,
     threshold_reached BOOLEAN NOT NULL DEFAULT FALSE,
     last_seen TIMESTAMPTZ,
     last_alert_at TIMESTAMPTZ,

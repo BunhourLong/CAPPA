@@ -23,18 +23,31 @@ class SecurityEngine:
         for detector in self.detectors:
             alerts.extend(detector.evaluate(event))
 
-        alert_ids_by_ip: dict[str, list[int]] = {}
+        alerts_by_ip: dict[str, list[DetectionAlert]] = {}
         for alert in alerts:
             alert.event_id = event_id
-            alert.id = self.repository.insert_alert(alert)
-            alert_ids_by_ip.setdefault(alert.ip, []).append(alert.id)
+            alerts_by_ip.setdefault(alert.ip, []).append(alert)
 
-        for ip, alert_ids in alert_ids_by_ip.items():
-            self.enforcement_service.sync_ip_and_blocklist(
-                ip,
-                trigger_reason="new_alerts_detected",
-                source_alert_ids=alert_ids,
-                manual_or_auto="auto",
-            )
+        synced_any = False
+        try:
+            for ip, ip_alerts in alerts_by_ip.items():
+                # Insert and re-score under one per-IP advisory lock: the stored record is
+                # computed from exactly the alerts this transaction commits.
+                with self.repository.ip_transaction(ip) as conn:
+                    alert_ids: list[int] = []
+                    for alert in ip_alerts:
+                        alert.id = self.repository.insert_alert(alert, conn=conn)
+                        alert_ids.append(alert.id)
+                    self.enforcement_service.recalculate_ip_reputation(
+                        ip,
+                        trigger_reason="new_alerts_detected",
+                        source_alert_ids=alert_ids,
+                        manual_or_auto="auto",
+                        conn=conn,
+                    )
+                synced_any = True
+        finally:
+            if synced_any:
+                self.enforcement_service.sync_blocklist()
 
         return alerts

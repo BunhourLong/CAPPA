@@ -4,7 +4,10 @@ import os
 import time
 from datetime import datetime, timedelta
 
+from psycopg import Connection
+
 from src.security_engine.enforcement import (
+    ALERT_HOLD_MIN_WEIGHT,
     IPReputationRecord,
     NginxBlocklistManager,
     ReputationConfig,
@@ -15,6 +18,10 @@ from src.security_engine.enforcement import (
     utc_now,
 )
 from src.security_engine.repository import SecurityRepository
+
+
+def _log(message: str) -> None:
+    print(f"[security_engine] {message}", flush=True)
 
 
 class EnforcementService:
@@ -55,18 +62,39 @@ class EnforcementService:
         manual_or_auto: str = "auto",
         now: datetime | None = None,
     ) -> list[dict]:
-        records: list[dict] = []
+        """Periodic tick: re-score only IPs that still have work to do.
+
+        IPs inside the scoring window with new alerts, or with lingering state (score, block,
+        cooldown), are recalculated. Everything else is left alone so decay/expiry are the only
+        reasons a stored row changes.
+        """
         effective_now = ensure_utc(now) or utc_now()
-        for ip in self.repository.list_known_ips():
-            records.append(
-                self.recalculate_ip_reputation(
-                    ip,
-                    trigger_reason=trigger_reason,
-                    manual_or_auto=manual_or_auto,
-                    now=effective_now,
-                )
-            )
-        self.sync_blocklist()
+        since = effective_now - timedelta(seconds=self.config.scoring_window_seconds)
+        candidates = self.repository.list_ips_needing_refresh(since)
+        first_error: Exception | None = None
+        records: list[dict] = []
+        try:
+            for ip in candidates:
+                try:
+                    records.append(
+                        self.recalculate_ip_reputation(
+                            ip,
+                            trigger_reason=trigger_reason,
+                            manual_or_auto=manual_or_auto,
+                            now=now,
+                        )
+                    )
+                except Exception as exc:
+                    # One failing IP must not starve the rest; re-raise the first after the sync.
+                    if first_error is None:
+                        first_error = exc
+                    _log(f"Failed to recalculate reputation for {ip}: {type(exc).__name__}")
+        finally:
+            # Unconditional: write_blocklist skips the disk when nothing changed, and syncing
+            # even with no candidates heals a stale or raced blocklist.conf.
+            self.sync_blocklist()
+        if first_error is not None:
+            raise first_error
         return records
 
     def recalculate_ip_reputation(
@@ -77,11 +105,56 @@ class EnforcementService:
         source_alert_ids: list[int] | None = None,
         manual_or_auto: str = "auto",
         now: datetime | None = None,
+        conn: Connection | None = None,
     ) -> dict:
+        if conn is not None:
+            return self._recalculate_locked(
+                ip,
+                conn,
+                trigger_reason=trigger_reason,
+                source_alert_ids=source_alert_ids,
+                manual_or_auto=manual_or_auto,
+                now=now,
+            )
+        with self.repository.ip_transaction(ip) as locked_conn:
+            return self._recalculate_locked(
+                ip,
+                locked_conn,
+                trigger_reason=trigger_reason,
+                source_alert_ids=source_alert_ids,
+                manual_or_auto=manual_or_auto,
+                now=now,
+            )
+
+    def _recalculate_locked(
+        self,
+        ip: str,
+        conn: Connection,
+        *,
+        trigger_reason: str,
+        source_alert_ids: list[int] | None,
+        manual_or_auto: str,
+        now: datetime | None,
+    ) -> dict:
+        """Score one IP inside a transaction that already holds the per-IP advisory lock."""
         effective_now = ensure_utc(now) or utc_now()
-        previous_record = self._get_existing_record(ip)
-        alert_rows = self.repository.list_alert_rows_for_ip(ip)
-        ip_activity = self.repository.get_ip_activity(ip)
+        previous_record = self._get_existing_record(ip, conn=conn)
+        cutoff = effective_now - timedelta(seconds=self.config.scoring_window_seconds)
+        alert_rows = self.repository.list_alert_rows_for_ip(ip, since=cutoff, conn=conn)
+        hold_types, hold_severities, non_hold_types, known_severities, default_severity_holds = (
+            self._hold_query_params()
+        )
+        older_hold_ids = self.repository.list_older_hold_alert_ids(
+            ip,
+            before=cutoff,
+            hold_types=hold_types,
+            hold_severities=hold_severities,
+            non_hold_types=non_hold_types,
+            known_severities=known_severities,
+            default_severity_holds=default_severity_holds,
+            conn=conn,
+        )
+        ip_activity = self.repository.get_ip_activity(ip, conn=conn)
 
         evaluation = evaluate_ip_reputation(
             ip=ip,
@@ -92,8 +165,9 @@ class EnforcementService:
             config=self.config,
             trigger_reason=trigger_reason,
             source_alert_ids=source_alert_ids,
+            older_hold_alert_ids=older_hold_ids,
         )
-        stored_record = self.repository.upsert_ip_reputation(evaluation)
+        stored_record = self.repository.upsert_ip_reputation(evaluation, conn=conn)
 
         if self._should_record_transition(previous_record, evaluation, manual_or_auto):
             self.repository.insert_reputation_transition(
@@ -107,10 +181,27 @@ class EnforcementService:
                     source_alert_ids=evaluation.source_alert_ids,
                     manual_or_auto=manual_or_auto,
                     created_at=effective_now,
-                )
+                ),
+                conn=conn,
             )
 
         return stored_record
+
+    def _hold_query_params(self) -> tuple[list[str], list[str], list[str], list[str], bool]:
+        """SQL decomposition of the alert-hold rule: severity='high' or base weight >= threshold."""
+        hold_types = [
+            alert_type for alert_type, weight in self.config.alert_weights.items() if weight >= ALERT_HOLD_MIN_WEIGHT
+        ]
+        # Types with an explicit weight take it regardless of severity; untyped ones fall back to
+        # their severity weight, and unknown severities default to the medium weight — the SQL
+        # mirrors weight_for_alert exactly so both sides agree on what keeps a hold alive.
+        non_hold_types = list(self.config.alert_weights)
+        hold_severities = [
+            severity for severity, weight in self.config.severity_weights.items() if weight >= ALERT_HOLD_MIN_WEIGHT
+        ]
+        known_severities = list(self.config.severity_weights)
+        default_severity_holds = self.config.severity_weights.get("medium", 10.0) >= ALERT_HOLD_MIN_WEIGHT
+        return hold_types, hold_severities, non_hold_types, known_severities, default_severity_holds
 
     def sync_ip_and_blocklist(
         self,
@@ -132,25 +223,46 @@ class EnforcementService:
         return record
 
     def sync_blocklist(self) -> None:
-        blocked_ips = [record["ip"] for record in self.repository.list_blocked_ips()]
-        self.blocklist_manager.write_blocklist(blocked_ips)
+        with self.repository.blocklist_sync_transaction() as conn:
+            blocked_ips = [record["ip"] for record in self.repository.list_blocked_ips(conn=conn)]
+            self.blocklist_manager.write_blocklist(blocked_ips)
 
     def update_alert_status(self, alert_id: int, status: str) -> dict | None:
-        alert = self.repository.update_alert_status(alert_id, status)
-        if not alert:
+        current = self.repository.get_alert(alert_id)
+        if not current:
             return None
-
-        self.sync_ip_and_blocklist(
-            alert["ip"],
-            trigger_reason=f"alert_status_changed:{status}",
-            source_alert_ids=[alert_id],
-            manual_or_auto="manual",
-        )
+        with self.repository.ip_transaction(current["ip"]) as conn:
+            alert = self.repository.update_alert_status(alert_id, status, conn=conn)
+            if not alert:
+                return None
+            self.recalculate_ip_reputation(
+                alert["ip"],
+                trigger_reason=f"alert_status_changed:{status}",
+                source_alert_ids=[alert_id],
+                manual_or_auto="manual",
+                conn=conn,
+            )
+        self.sync_blocklist()
         return self.repository.get_alert(alert_id)
 
+    def _apply_override(self, ip: str, *, trigger_reason: str, now: datetime | None = None, **override_fields) -> dict:
+        """Apply an analyst override and re-score the IP under the per-IP advisory lock."""
+        with self.repository.ip_transaction(ip) as conn:
+            self.repository.set_ip_override_fields(ip, conn=conn, **override_fields)
+            record = self.recalculate_ip_reputation(
+                ip,
+                trigger_reason=trigger_reason,
+                manual_or_auto="manual",
+                now=now,
+                conn=conn,
+            )
+        self.sync_blocklist()
+        return record
+
     def manual_block_ip(self, ip: str, reason: str | None = None) -> dict:
-        self.repository.set_ip_override_fields(
+        return self._apply_override(
             ip,
+            trigger_reason="manual_block_requested",
             whitelist=False,
             analyst_override="manual_block",
             blocked_until=None,
@@ -158,44 +270,50 @@ class EnforcementService:
             blocked_reason=reason or "manual_block",
             manual_blocked=True,
         )
-        return self.sync_ip_and_blocklist(
-            ip,
-            trigger_reason="manual_block_requested",
-            manual_or_auto="manual",
-        )
 
     def manual_unblock_ip(self, ip: str) -> dict:
-        record = self._get_existing_record(ip)
-        if record.alert_hold_active:
-            pending = record.unresolved_alert_count + record.malicious_alert_count
-            raise ValueError(
-                f"Cannot unblock {ip}: alert hold is active "
-                f"({pending} unresolved/malicious alert(s) still require analyst review). "
-                "Mark all alerts safe first, or use force_unblock (admin only)."
-            )
         now = utc_now()
-        self.repository.set_ip_override_fields(
-            ip,
-            whitelist=False,
-            analyst_override="suppress_auto_block",
-            blocked_until=None,
-            cooldown_until=now + timedelta(seconds=self.config.cooldown_duration_seconds),
-            blocked_reason=None,
-            manual_blocked=False,
-        )
-        return self.sync_ip_and_blocklist(
-            ip,
-            trigger_reason="manual_unblock_requested",
-            manual_or_auto="manual",
-            now=now,
-        )
+        with self.repository.ip_transaction(ip) as conn:
+            existing = self._get_existing_record(ip, conn=conn)
+            if existing.alert_hold_active:
+                pending = existing.unresolved_alert_count + existing.malicious_alert_count
+                detail = (
+                    f"{pending} unresolved/malicious alert(s) still require analyst review"
+                    if pending > 0
+                    else "an older unresolved/malicious alert still requires analyst review"
+                )
+                raise ValueError(
+                    f"Cannot unblock {ip}: alert hold is active ({detail}). "
+                    "Mark all alerts safe first, or use force_unblock (admin only)."
+                )
+            self.repository.set_ip_override_fields(
+                ip,
+                conn=conn,
+                whitelist=False,
+                analyst_override="suppress_auto_block",
+                blocked_until=None,
+                cooldown_until=now + timedelta(seconds=self.config.cooldown_duration_seconds),
+                blocked_reason=None,
+                manual_blocked=False,
+            )
+            record = self.recalculate_ip_reputation(
+                ip,
+                trigger_reason="manual_unblock_requested",
+                manual_or_auto="manual",
+                now=now,
+                conn=conn,
+            )
+        self.sync_blocklist()
+        return record
 
     def force_unblock_ip(self, ip: str, duration_seconds: int | None = None) -> dict:
         """Admin-only: release an alert-hold block for a cooldown window, bypassing alert review."""
         now = utc_now()
         window = duration_seconds or self.config.suppress_duration_seconds
-        self.repository.set_ip_override_fields(
+        return self._apply_override(
             ip,
+            trigger_reason="force_unblock_requested",
+            now=now,
             whitelist=False,
             analyst_override="force_unblock",
             blocked_until=None,
@@ -203,16 +321,11 @@ class EnforcementService:
             blocked_reason=None,
             manual_blocked=False,
         )
-        return self.sync_ip_and_blocklist(
-            ip,
-            trigger_reason="force_unblock_requested",
-            manual_or_auto="manual",
-            now=now,
-        )
 
     def trust_ip(self, ip: str, *, whitelist: bool = True) -> dict:
-        self.repository.set_ip_override_fields(
+        return self._apply_override(
             ip,
+            trigger_reason="analyst_trusted_ip",
             whitelist=whitelist,
             analyst_override="trusted",
             blocked_until=None,
@@ -220,26 +333,17 @@ class EnforcementService:
             blocked_reason=None,
             manual_blocked=False,
         )
-        return self.sync_ip_and_blocklist(
-            ip,
-            trigger_reason="analyst_trusted_ip",
-            manual_or_auto="manual",
-        )
 
     def remove_trust_ip(self, ip: str) -> dict:
-        self.repository.set_ip_override_fields(
+        return self._apply_override(
             ip,
+            trigger_reason="analyst_removed_trust",
             whitelist=False,
             analyst_override=None,
             blocked_until=None,
             cooldown_until=None,
             blocked_reason=None,
             manual_blocked=False,
-        )
-        return self.sync_ip_and_blocklist(
-            ip,
-            trigger_reason="analyst_removed_trust",
-            manual_or_auto="manual",
         )
 
     def suppress_auto_block(
@@ -250,40 +354,50 @@ class EnforcementService:
         whitelist: bool | None = None,
     ) -> dict:
         now = utc_now()
-        existing = self._get_existing_record(ip)
         suppression_window = duration_seconds or self.config.suppress_duration_seconds
-        self.repository.set_ip_override_fields(
-            ip,
-            whitelist=existing.whitelist if whitelist is None else whitelist,
-            analyst_override="suppress_auto_block",
-            blocked_until=None,
-            cooldown_until=now + timedelta(seconds=max(1, suppression_window)),
-            blocked_reason=None,
-            manual_blocked=False,
-        )
-        return self.sync_ip_and_blocklist(
-            ip,
-            trigger_reason="temporary_auto_block_suppression",
-            manual_or_auto="manual",
-            now=now,
-        )
+        with self.repository.ip_transaction(ip) as conn:
+            existing = self._get_existing_record(ip, conn=conn)
+            self.repository.set_ip_override_fields(
+                ip,
+                conn=conn,
+                whitelist=existing.whitelist if whitelist is None else whitelist,
+                analyst_override="suppress_auto_block",
+                blocked_until=None,
+                cooldown_until=now + timedelta(seconds=max(1, suppression_window)),
+                blocked_reason=None,
+                manual_blocked=False,
+            )
+            record = self.recalculate_ip_reputation(
+                ip,
+                trigger_reason="temporary_auto_block_suppression",
+                manual_or_auto="manual",
+                now=now,
+                conn=conn,
+            )
+        self.sync_blocklist()
+        return record
 
     def clear_override(self, ip: str) -> dict:
-        existing = self._get_existing_record(ip)
-        self.repository.set_ip_override_fields(
-            ip,
-            whitelist=existing.whitelist,
-            analyst_override=None,
-            blocked_until=None,
-            cooldown_until=None,
-            blocked_reason=None,
-            manual_blocked=False,
-        )
-        return self.sync_ip_and_blocklist(
-            ip,
-            trigger_reason="analyst_cleared_override",
-            manual_or_auto="manual",
-        )
+        with self.repository.ip_transaction(ip) as conn:
+            existing = self._get_existing_record(ip, conn=conn)
+            self.repository.set_ip_override_fields(
+                ip,
+                conn=conn,
+                whitelist=existing.whitelist,
+                analyst_override=None,
+                blocked_until=None,
+                cooldown_until=None,
+                blocked_reason=None,
+                manual_blocked=False,
+            )
+            record = self.recalculate_ip_reputation(
+                ip,
+                trigger_reason="analyst_cleared_override",
+                manual_or_auto="manual",
+                conn=conn,
+            )
+        self.sync_blocklist()
+        return record
 
     def apply_ip_control(
         self,
@@ -310,8 +424,12 @@ class EnforcementService:
 
         raise ValueError(f"Unsupported IP control action: {action}")
 
-    def _get_existing_record(self, ip: str) -> IPReputationRecord:
-        existing_row = self.repository.get_ip_reputation(ip)
+    def _get_existing_record(self, ip: str, conn: Connection | None = None) -> IPReputationRecord:
+        existing_row = (
+            self.repository.get_ip_reputation(ip, conn=conn)
+            if conn is not None
+            else self.repository.get_ip_reputation(ip)
+        )
         return build_record_from_row(existing_row) or IPReputationRecord(ip=ip)
 
     @staticmethod

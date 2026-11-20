@@ -186,7 +186,11 @@
                         disabled
                         title="Alert hold active — mark all alerts safe before releasing"
                       >
-                        Hold active ({{ row.pendingReview }} pending)
+                        @if (row.pendingReview > 0) {
+                          Hold active ({{ row.pendingReview }} pending)
+                        } @else {
+                          Hold active (older alert pending)
+                        }
                       </button>
                       @if (session.isAdmin()) {
                         <button
@@ -310,7 +314,11 @@
                     </div>
                     <div>
                       <p class="details__label">Alert hold</p>
-                      @if (alert.alert_hold_active) {
+                      @if (alert.alert_hold_active && row.pendingReview === 0) {
+                        <p class="details__value details__value--alarm">
+                          Active — older unresolved/malicious alert(s) pending review
+                        </p>
+                      } @else if (alert.alert_hold_active) {
                         <p class="details__value details__value--alarm">
                           Active — {{ row.pendingReview }} alert(s) pending review ({{
                             alert.unresolved_alert_count
